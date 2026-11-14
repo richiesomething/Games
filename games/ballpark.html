@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ballpark · Parlor</title>
+<meta name="theme-color" content="#14111f">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📏</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700;9..144,800&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/css/parlor.css">
+<style>
+.q{font-family:var(--display);font-weight:700;font-size:clamp(24px,6.6vw,34px);line-height:1.15}
+.unit{color:var(--mute);font-weight:700;margin-top:6px}
+.numin{width:100%;font-family:var(--display);font-weight:800;font-size:clamp(34px,10vw,48px);text-align:center;padding:14px;border-radius:16px;border:2px solid var(--acc);background:var(--bg2);outline:none}
+.parsed{min-height:22px;color:var(--mute);font-size:14px;margin-top:6px}
+.ans{font-family:var(--display);font-weight:800;font-size:clamp(44px,13vw,72px);color:var(--acc);line-height:1}
+.line{position:relative;height:66px;margin:22px 8px 6px}
+.line .ax{position:absolute;left:0;right:0;top:32px;height:3px;background:var(--line);border-radius:2px}
+.line .mk{position:absolute;top:22px;width:14px;height:14px;margin-left:-7px;border-radius:50%;border:2px solid #14111f;transition:left .9s cubic-bezier(.2,.8,.2,1)}
+.line .tru{position:absolute;top:8px;bottom:4px;width:3px;margin-left:-1.5px;background:var(--ink);border-radius:2px}
+.line .tru::after{content:"answer";position:absolute;top:-16px;left:50%;transform:translateX(-50%);font-size:11px;font-weight:800;color:var(--mute)}
+.res .srow .sub b{color:var(--ink)}
+</style>
+</head>
+<body>
+<main class="wrap" id="app"></main>
+<script src="../assets/data/ballpark.js"></script>
+<script src="../assets/js/parlor.js"></script>
+<script>
+const app = GN.page({ title:"Ballpark", accent:"#6fb6ff", accentInk:"#04203b" });
+const QS = (window.GN_DATA && GN_DATA.estimates) || [];
+const cfg = Object.assign({ rounds:10, rule:"closest", entry:"phone" }, GN.get("ballpark.cfg", {}));
+const save = () => GN.set("ballpark.cfg", cfg);
+const isYear = q => /year/i.test(q.u);
+let G = null;
+
+function setup(){
+  GN.render(`<div class="stack">
+    <div><div class="kicker">Estimation · reasoning</div><h1>Ballpark</h1>
+    <p class="lede">Nobody knows exactly how many steps there are in the Eiffel Tower. Reason it out, make a secret guess, and the closest wins the round.</p></div>
+    <div id="roster"></div>
+    <div class="card">
+      <h3>Settings</h3>
+      <div class="setting"><div class="lab">Questions</div>${GN.seg("rounds", [6, 10, 15], cfg.rounds)}</div>
+      <div class="setting"><div class="lab">Winning rule<small id="rh"></small></div>${GN.seg("rule", ["closest", "under"], cfg.rule, v => v === "closest" ? "Closest" : "No going over")}</div>
+      <div class="setting"><div class="lab">Guesses go on<small id="eh"></small></div>${GN.seg("entry", ["phone", "paper"], cfg.entry, v => v === "phone" ? "This phone" : "Paper")}</div>
+    </div>
+    <div class="card"><h3>Scoring</h3><p class="small muted" style="margin:0">Closest <b style="color:var(--ink)">3</b> · second <b style="color:var(--ink)">2</b> · third <b style="color:var(--ink)">1</b>. Bonus <b style="color:var(--ink)">+2</b> for landing within 5% (or within 2 years for dates). ${QS.length} questions in the pool.</p></div>
+    <button class="btn primary big block" id="go">Start</button>
+  </div>`);
+  GN.rosterBlock(GN.$("#roster"));
+  GN.bindSegs(app, cfg, () => { save(); setup(); });
+  GN.$("#rh").textContent = cfg.rule === "closest" ? "Plain closeness wins." : "Price-is-Right rules. Go over and you score nothing.";
+  GN.$("#eh").textContent = cfg.entry === "phone" ? "Pass the phone and type guesses in secret. Shorthand works: 1.5m, 40k, 2,500." : "Everyone writes their guess down. Faster with a big group.";
+  GN.$("#go").onclick = start;
+}
+function start(){
+  const sides = GN.sides(); if (sides.length < 2) return GN.toast("Need at least 2 sides");
+  G = { sides, scores:sides.map(() => 0), n:0, qs:GN.deal("ballpark", QS, cfg.rounds, q => q.q) };
+  GN._wantWake = true; GN.wake(true);
+  question();
+}
+function question(){
+  if (G.n >= G.qs.length) return GN.finish({ gameId:"ballpark", gameName:"Ballpark", sides:G.sides, scores:G.scores, onRematch:start });
+  const Q = G.qs[G.n];
+  GN.stage(`<div class="wrap" style="width:100%">
+    <div class="kicker">Question ${G.n + 1} of ${G.qs.length}</div>
+    <div class="q" style="margin:16px 0 4px">${GN.esc(Q.q)}</div><div class="unit">Answer in ${GN.esc(Q.u)}</div>
+    <p class="muted" style="margin-top:22px">${cfg.entry === "phone" ? "Read it out, then pass the phone around for secret guesses." : "Everyone write down a guess. No peeking at your neighbor!"}</p>
+    <div class="btns"><button class="btn primary big" id="ok">${cfg.entry === "phone" ? "Collect guesses" : "Reveal the answer"}</button></div></div>`);
+  const order = G.sides.map((_, i) => (i + G.n) % G.sides.length);
+  GN.$("#ok").onclick = () => cfg.entry === "phone" ? collect(Q, order, 0, {}) : paperReveal(Q);
+}
+function collect(Q, order, k, guesses){
+  if (k >= order.length) return reveal(Q, guesses);
+  const si = order[k], s = G.sides[si];
+  GN.handoff({ to:s.name, color:s.color, emoji:"🤫", msg:`Secret guess ${k + 1} of ${order.length}`, button:"Enter my guess", onReady:() => {
+    const el = GN.stage(`<div class="wrap" style="width:100%">
+      <div class="kicker">${GN.esc(s.name)}</div><div class="q" style="margin:10px 0 4px;font-size:22px">${GN.esc(Q.q)}</div><div class="unit">${GN.esc(Q.u)}</div>
+      <input class="numin" id="g" inputmode="decimal" autocomplete="off" placeholder="?" style="margin-top:16px"><div class="parsed" id="pp"></div>
+      <div class="btns"><button class="btn primary big" id="ok" disabled>Lock it in</button></div></div>`);
+    const inp = GN.$("#g", el), ok = GN.$("#ok", el);
+    inp.oninput = () => { const v = GN.parseNum(inp.value); ok.disabled = v == null; GN.$("#pp").textContent = v == null ? (inp.value ? "Not a number I understand" : "") : "= " + (isYear(Q) ? v : GN.fmtNum(v)); };
+    inp.onkeydown = e => { if (e.key === "Enter" && !ok.disabled) ok.click(); };
+    ok.onclick = () => { guesses[si] = GN.parseNum(inp.value); inp.blur(); GN.sfx.tap(); collect(Q, order, k + 1, guesses); };
+    setTimeout(() => inp.focus(), 80);
+  } });
+}
+function close(Q, g){ const d = Math.abs(g - Q.a); return isYear(Q) ? d <= 2 : (Q.a === 0 ? d === 0 : d / Math.abs(Q.a) <= .05); }
+function reveal(Q, guesses){
+  const ids = Object.keys(guesses).map(Number);
+  const eligible = ids.filter(i => cfg.rule === "closest" || guesses[i] <= Q.a);
+  const ranked = eligible.slice().sort((a, b) => Math.abs(guesses[a] - Q.a) - Math.abs(guesses[b] - Q.a));
+  const delta = G.sides.map(() => 0); let place = 0;
+  ranked.forEach((i, k) => { if (k > 0 && Math.abs(guesses[i] - Q.a) !== Math.abs(guesses[ranked[k - 1]] - Q.a)) place = k; delta[i] += [3, 2, 1][place] || 0; if (close(Q, guesses[i])) delta[i] += 2; });
+  // number line: log-ish scale centred on the answer
+  const all = [...ids.map(i => guesses[i]), Q.a];
+  const pos = v => { const lo = Math.min(...all), hi = Math.max(...all); if (hi === lo) return 50;
+    const pos0 = Math.min(...all) > 0 && hi / lo > 50 ? (Math.log(v) - Math.log(lo)) / (Math.log(hi) - Math.log(lo)) : (v - lo) / (hi - lo); return 4 + pos0 * 92; };
+  delta.forEach((d, i) => G.scores[i] += d); G.n++;
+  const el = GN.stage(`<div class="wrap" style="width:100%">
+    <div class="q" style="font-size:20px">${GN.esc(Q.q)}</div>
+    <div class="ans" style="margin-top:14px" id="A">…</div><div class="unit">${GN.esc(Q.u)}</div>
+    ${Q.n ? `<p class="small muted">${GN.esc(Q.n)}</p>` : ""}
+    <div class="line"><div class="ax"></div><div class="tru" style="left:${pos(Q.a)}%"></div>${ids.map(i => `<div class="mk" data-l="${pos(guesses[i])}" style="left:50%;background:${G.sides[i].color}" title="${GN.esc(G.sides[i].name)}"></div>`).join("")}</div>
+    <div class="card res" style="text-align:left">${GN.board(G.sides, G.scores, { delta, sort:false, sub:(s, i) => guesses[i] == null ? "" : `guessed <b>${isYear(Q) ? guesses[i] : GN.fmtNum(guesses[i])}</b>${cfg.rule === "under" && guesses[i] > Q.a ? " · over!" : ""}${close(Q, guesses[i]) ? " · 🎯 bonus" : ""}` })}</div>
+    <div class="btns"><button class="btn primary big" id="next">${G.n >= G.qs.length ? "Final scores 🏆" : "Next question"}</button></div></div>`);
+  const fmt = v => isYear(Q) ? String(v) : GN.fmtNum(v);
+  setTimeout(() => { GN.$("#A", el).textContent = fmt(Q.a); GN.sfx.ding(); GN.$$(".mk", el).forEach(m => m.style.left = m.dataset.l + "%"); if (delta.some(d => d >= 5)) { GN.sfx.win(); GN.confetti(); } }, 700);
+  GN.$("#next").onclick = question;
+}
+function paperReveal(Q){
+  const order = [];
+  const draw = () => {
+    GN.stage(`<div class="wrap" style="width:100%">
+      <div class="q" style="font-size:20px">${GN.esc(Q.q)}</div>
+      <div class="ans" style="margin-top:14px">${isYear(Q) ? Q.a : GN.fmtNum(Q.a)}</div><div class="unit">${GN.esc(Q.u)}</div>
+      ${Q.n ? `<p class="small muted">${GN.esc(Q.n)}</p>` : ""}
+      <p class="muted">Read your guesses out. Tap the closest first, then second, then third.${cfg.rule === "under" ? " Anyone who went over doesn't count." : ""} Long-press for the within-5% bonus.</p>
+      <div class="sidegrid">${G.sides.map((s, i) => { const k = order.findIndex(o => o.i === i); return `<button class="sidebtn" data-i="${i}" style="--sc:${s.color}" aria-pressed="${k >= 0}">${GN.esc(s.name)}<small>${k >= 0 ? ["1st", "2nd", "3rd"][k] + (order[k].bonus ? " · 🎯" : "") : ""}</small></button>`; }).join("")}</div>
+      <div class="btns two"><button class="btn" id="clr">Clear</button><button class="btn primary" id="ok">Score it</button></div></div>`);
+    GN.$$("[data-i]").forEach(b => {
+      let t = null, long = false;
+      b.onpointerdown = () => { long = false; t = setTimeout(() => { long = true; const o = order.find(o => o.i === +b.dataset.i); if (o) { o.bonus = !o.bonus; GN.sfx.ding(); draw(); } }, 550); };
+      b.onpointerup = b.onpointerleave = () => clearTimeout(t);
+      b.onclick = () => { if (long) return; const i = +b.dataset.i; const k = order.findIndex(o => o.i === i); if (k >= 0) order.splice(k, 1); else if (order.length < 3) order.push({ i, bonus:false }); GN.sfx.tap(); draw(); };
+    });
+    GN.$("#clr").onclick = () => { order.length = 0; draw(); };
+    GN.$("#ok").onclick = () => { const delta = G.sides.map(() => 0); order.forEach((o, k) => delta[o.i] += [3, 2, 1][k] + (o.bonus ? 2 : 0));
+      delta.forEach((d, i) => G.scores[i] += d); G.n++;
+      GN.stage(`<div class="wrap" style="width:100%"><div class="kicker">After question ${G.n}</div><div class="card" style="text-align:left;margin-top:12px">${GN.board(G.sides, G.scores, { delta, sort:true })}</div>
+        <div class="btns"><button class="btn primary big" id="nx">${G.n >= G.qs.length ? "Final scores 🏆" : "Next question"}</button></div></div>`);
+      GN.$("#nx").onclick = question; };
+  };
+  draw();
+}
+setup();
+</script>
+</body>
+</html>

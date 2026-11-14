@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Parlor · Party Games</title>
+<meta name="description" content="Party games for clever people. 6 to 8 players, solo or in teams of two, one phone passed around.">
+<meta name="theme-color" content="#14111f">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎲</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700;9..144,800&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/parlor.css">
+<style>
+.hero{padding:26px 0 10px}
+.hero h1 span{color:var(--acc);font-style:italic}
+.games{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:12px;margin-top:14px}
+.g{display:flex;flex-direction:column;gap:8px;text-decoration:none;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:16px;
+  position:relative;overflow:hidden;transition:transform .1s}
+.g:active{transform:scale(.985)}
+.g::before{content:"";position:absolute;inset:0 0 auto 0;height:5px;background:var(--gc)}
+.g .top{display:flex;align-items:center;gap:12px}
+.g .ic{width:48px;height:48px;border-radius:14px;display:grid;place-items:center;font-size:26px;background:color-mix(in srgb,var(--gc) 22%,transparent);flex:none}
+.g .nm{font-family:var(--display);font-weight:800;font-size:22px;line-height:1.05}
+.g .like{font-size:12.5px;color:var(--faint);font-weight:700}
+.g p{margin:0;color:var(--mute);font-size:15px;line-height:1.4}
+.g .pillrow{margin-top:auto}
+.standrow{display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--line)}
+.standrow:first-child{border-top:0}
+.standrow .n{flex:1;font-weight:800}
+.standrow b{font-family:var(--display);font-size:22px}
+.hist{font-size:14px;color:var(--mute)}
+.hist li{margin:3px 0}
+.tips li{color:var(--mute);margin:6px 0}
+.tips b{color:var(--ink)}
+.sec{margin-top:28px}
+</style>
+</head>
+<body>
+<main class="wrap wide">
+  <header class="hero">
+    <div class="kicker">Game night, sorted</div>
+    <h1>Parlor<span>.</span></h1>
+    <p class="lede">Party games for clever people. Built for 6 to 8 players, playing solo or in teams of two, with one phone passed around the room.</p>
+  </header>
+
+  <div class="grid2" style="display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));align-items:start">
+    <section class="card" id="players"><div id="roster"></div></section>
+    <section class="card" id="standings"></section>
+  </div>
+
+  <section class="sec">
+    <div class="row between"><h2>Pick a game</h2><div class="chips" id="filters"></div></div>
+    <div class="games" id="games"></div>
+  </section>
+
+  <section class="sec">
+    <details class="card rules tips">
+      <summary>How Parlor works</summary>
+      <ul>
+        <li><b>Set up once.</b> Enter everyone's names above and choose individuals or teams of two. Every game uses that list.</li>
+        <li><b>One phone.</b> Every game is pass-and-play. Screens that hide secrets ask you to hand the phone over first.</li>
+        <li><b>Game-night standings.</b> When a game ends, sides earn night points by placement: 5 for 1st, 3 for 2nd, 2 for 3rd, 1 for 4th. Points go to each player, so you can reshuffle teams between games.</li>
+        <li><b>No repeats.</b> Each game remembers which cards this device has dealt and works through the whole pool before repeating.</li>
+        <li><b>Pen and paper</b> help for Categories, Common Thread and Fictionary. Some games also let you type on the phone.</li>
+        <li><b>Tip:</b> use "Add to Home Screen" to run it full-screen like an app.</li>
+      </ul>
+    </details>
+  </section>
+  <p class="tiny muted center" style="margin-top:28px">Made for game night. Nothing leaves this device.</p>
+</main>
+
+<script src="assets/js/parlor.js"></script>
+<script>
+const GAMES = [
+  { id:"forehead",   nm:"Forehead",        ic:"🤳", c:"#ff6b8b", like:"Like Heads Up · Taboo", p:"Phone on your forehead. Your team shouts clues and you guess before time runs out. Optional forbidden-words mode.", tags:["loud","words"], t:"15–30 min" },
+  { id:"fishbowl",   nm:"Fishbowl",        ic:"🐟", c:"#4cc9f0", like:"Like Monikers · Celebrity", p:"One pile of names, three rounds: describe it, then one word only, then charades. The same cards get funnier each round.", tags:["loud","words","acting"], t:"30–45 min" },
+  { id:"twenty",     nm:"Twenty Questions",ic:"❓", c:"#ffd166", like:"Classic · hot-seat version", p:"One side holds a secret and the room gets 20 yes-or-no questions. Solve it early for big points. The answerer scores if it lands in the sweet spot.", tags:["thinky","deduction"], t:"20–40 min" },
+  { id:"categories", nm:"Categories",      ic:"📝", c:"#7ae582", like:"Like Scattergories", p:"One letter, a dozen clever categories, three minutes. Only unique answers score. Over 850 categories, and other phones can join with a code.", tags:["thinky","words","paper"], t:"20–40 min" },
+  { id:"spectrum",   nm:"Spectrum",        ic:"🎯", c:"#c39bff", like:"Like Wavelength", p:"Somewhere between “Overrated” and “Underrated” is a hidden target. Give one clue and your partner turns the dial.", tags:["thinky","debate"], t:"20–40 min" },
+  { id:"thread",     nm:"Common Thread",   ic:"🧵", c:"#ff9f5a", like:"Like Only Connect", p:"Four clues appear one at a time. Find what links them. Lock in early for more points, or wait for a safer guess.", tags:["thinky","trivia"], t:"15–30 min" },
+  { id:"fictionary", nm:"Fictionary",      ic:"📖", c:"#5eead4", like:"Like Balderdash", p:"A real but obscure word. Everyone invents a convincing definition. Score by finding the real one and by fooling your friends.", tags:["bluffing","words","paper"], t:"30–45 min" },
+  { id:"imposter",   nm:"Imposter",        ic:"🕵️", c:"#f4a3d6", like:"Like The Chameleon · Spyfall", p:"Everyone knows the secret word except one person. Say one word each, then vote. If the imposter is caught, they can still win by guessing the word.", tags:["bluffing","deduction"], t:"15–30 min" },
+  { id:"ballpark",   nm:"Ballpark",        ic:"📏", c:"#6fb6ff", like:"Like Wits & Wagers", p:"How tall is Everest in feet? What year was Coca-Cola invented? Everyone secretly guesses and the closest wins.", tags:["thinky","trivia"], t:"15–30 min" },
+  { id:"hotpotato",  nm:"Hot Potato",      ic:"💣", c:"#ff5d6c", like:"Like Catch Phrase · Pass the Bomb", p:"Shout an answer, pass the phone. The fuse is secret. Whoever is holding it when it blows takes a strike.", tags:["loud","words"], t:"10–20 min" },
+  { id:"chronology", nm:"Chronology",      ic:"⏳", c:"#ffb84d", like:"Like Timeline", p:"Which came first, the fax machine or the Civil War? Fit each event into your timeline. First to a full timeline wins.", tags:["thinky","trivia"], t:"20–30 min" },
+];
+const FILTERS = [["all","All"],["loud","Loud & fast"],["thinky","Thinky"],["bluffing","Bluffing"],["words","Wordplay"],["trivia","Trivia-ish"]];
+let filter = "all";
+
+function drawGames(){
+  GN.$("#filters").innerHTML = FILTERS.map(([k,l]) => `<button class="chip" data-f="${k}" aria-pressed="${k===filter}">${l}</button>`).join("");
+  GN.$$("#filters .chip").forEach(b => b.onclick = () => { filter = b.dataset.f; drawGames(); });
+  const n = GN.sides().length, pairs = GN.isPairs();
+  GN.$("#games").innerHTML = GAMES.filter(g => filter === "all" || g.tags.includes(filter)).map(g => `
+    <a class="g" href="games/${g.id}.html" style="--gc:${g.c}">
+      <div class="top"><div class="ic">${g.ic}</div><div><div class="nm">${g.nm}</div><div class="like">${g.like}</div></div></div>
+      <p>${g.p}</p>
+      <div class="pillrow"><span class="pill">${g.t}</span>${g.id==="imposter"?`<span class="pill">always individual</span>`:`<span class="pill">solo or pairs</span>`}${g.tags.includes("paper")?`<span class="pill">pens help</span>`:""}</div>
+    </a>`).join("");
+}
+
+function drawStandings(){
+  const N = GN.night();
+  const el = GN.$("#standings");
+  if (!N.games.length) {
+    el.innerHTML = `<h3>Tonight's standings</h3><p class="muted small" style="margin:6px 0 0">No games finished yet. Placement points (5, 3, 2, 1) are credited to each player when a game ends, so you can reshuffle teams and still keep track.</p>`;
+    return;
+  }
+  el.innerHTML = `<div class="row between"><h3 style="margin:0">Tonight's standings</h3><button class="link small" id="reset">New night</button></div>
+    <div style="margin-top:8px">${N.players.map((p,i) => `<div class="standrow"><span class="muted" style="width:22px;font-weight:800">${i+1}</span><span class="n">${GN.esc(p.name)}${i===0?" 👑":""}<div class="tiny muted">${p.wins} win${p.wins===1?"":"s"} · ${p.games} game${p.games===1?"":"s"}</div></span><b>${p.night}</b></div>`).join("")}</div>
+    <details style="margin-top:10px"><summary class="small muted" style="cursor:pointer">Games played (${N.games.length})</summary>
+      <ul class="hist">${N.games.slice().reverse().map(g => `<li><b style="color:var(--ink)">${GN.esc(g.name)}</b>: ${g.results.filter(r=>r.rank===0).map(r=>GN.esc(r.name)).join(" & ")} won (${g.results.map(r=>GN.esc(r.name)+" "+r.pts).join(", ")})</li>`).join("")}</ul></details>`;
+  GN.$("#reset").onclick = () => { if (confirm("Start a new game night? This clears tonight's standings.")) { GN.resetNight(); drawStandings(); } };
+}
+
+GN.rosterEditor(GN.$("#roster"), { onChange: drawGames });
+drawGames(); drawStandings();
+</script>
+</body>
+</html>

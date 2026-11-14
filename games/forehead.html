@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Forehead · Parlor</title>
+<meta name="theme-color" content="#14111f">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🤳</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700;9..144,800&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/css/parlor.css">
+<style>
+.decks{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.deck{text-align:left;border:2px solid var(--line);border-radius:14px;padding:10px 12px;background:var(--panel2);display:flex;gap:10px;align-items:center}
+.deck .e{font-size:22px}
+.deck .n{font-weight:800;font-size:14.5px;line-height:1.15}
+.deck .c{font-size:12px;color:var(--mute)}
+.deck[aria-pressed="true"]{border-color:var(--acc);background:color-mix(in srgb,var(--acc) 16%,var(--panel2))}
+#play{background:var(--acc);color:var(--acc-ink);transition:background .15s;user-select:none;-webkit-user-select:none;touch-action:manipulation;overflow:hidden}
+#play.ok{background:var(--good)} #play.pass{background:#ff9f43} #play.foul{background:var(--bad)}
+.hud{position:absolute;top:calc(env(safe-area-inset-top,0px) + 8px);left:0;right:0;display:flex;justify-content:space-between;align-items:center;padding:0 18px;
+  font-family:var(--display);font-weight:800;font-size:26px;pointer-events:none;z-index:2}
+.hud .clock.low{color:#7a0010}
+.cardw{font-family:var(--display);font-weight:800;line-height:1;font-size:min(15vw,24vh);max-width:94vw;overflow-wrap:anywhere;text-wrap:balance}
+.cardw.long{font-size:min(10.5vw,17vh)}
+.deckname{font-weight:800;opacity:.6;letter-spacing:.12em;text-transform:uppercase;font-size:min(3.4vw,4vh);margin-bottom:1.5vh}
+#play .taboo span{background:rgba(0,0,0,.2);font-size:min(4.6vw,5.4vh)}
+#play .taboo .lab{width:100%;font-weight:800;opacity:.7;font-size:min(3.2vw,3.8vh)}
+.flash{font-family:var(--display);font-weight:800;font-size:min(18vw,26vh);color:#fff}
+.zones{position:absolute;inset:0;display:flex;z-index:1}
+.zones button{flex:1;color:transparent}
+.ctrls{position:absolute;bottom:calc(env(safe-area-inset-bottom,0px) + 10px);left:0;right:0;display:flex;justify-content:center;gap:8px;z-index:3}
+.ctrls button{border:2px solid rgba(0,0,0,.35);border-radius:999px;padding:7px 16px;font-weight:800;color:inherit;background:rgba(255,255,255,.15)}
+.cluebtns{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;width:min(560px,92vw);margin-top:4vh;position:relative;z-index:3}
+.cluebtns button{border-radius:18px;padding:18px 8px;font-weight:800;font-size:19px;color:#14111f;box-shadow:0 5px 0 rgba(0,0,0,.25)}
+.paused{position:absolute;inset:0;background:rgba(20,17,31,.92);color:var(--ink);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;z-index:5}
+.rev{list-style:none;padding:0;margin:0;columns:2;column-gap:10px}
+.rev li{break-inside:avoid;margin-bottom:6px}
+.rev button{width:100%;text-align:left;padding:8px 10px;border-radius:10px;background:var(--panel2);font-weight:700;display:flex;gap:8px;align-items:center}
+.rev button i{width:10px;height:10px;border-radius:50%;flex:none;background:var(--good)}
+.rev button.pass{color:var(--mute);text-decoration:line-through} .rev button.pass i{background:#ff9f43}
+.rev button.foul{color:var(--mute);text-decoration:line-through} .rev button.foul i{background:var(--bad)}
+.rot{display:none}
+@media (orientation:portrait){ .needland .rot{display:flex;position:absolute;inset:0;z-index:6;background:var(--acc);flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:30px} }
+</style>
+</head>
+<body>
+<main class="wrap" id="app"></main>
+<script src="../assets/data/decks_a.js"></script>
+<script src="../assets/data/decks_b.js"></script>
+<script src="../assets/js/parlor.js"></script>
+<script>
+const app = GN.page({ title:"Forehead", accent:"#ff6b8b", accentInk:"#2a0510" });
+const DECKS = (window.GN_DATA && GN_DATA.decks || []).filter(d => d.cards && d.cards.length);
+const cfg = Object.assign({ decks:DECKS.map(d => d.id), mode:"forehead", len:60, taboo:false, rounds:2, passes:0 }, GN.get("forehead.cfg", {}));
+cfg.decks = cfg.decks.filter(id => DECKS.some(d => d.id === id)); if (!cfg.decks.length) cfg.decks = DECKS.map(d => d.id);
+const save = () => GN.set("forehead.cfg", cfg);
+let G = null; // game state
+
+function setup(){
+  GN.render(`
+  <div class="stack">
+    <div><div class="kicker">Clue-giving · fast</div><h1 style="font-size:clamp(40px,12vw,58px)">Forehead</h1>
+    <p class="lede">The guesser can't see the card. Everyone else can. Shout clues, act it out, and get through as many as you can before the clock runs out.</p></div>
+    <div id="roster"></div>
+    <div class="card">
+      <h3>How you'll play</h3>
+      <div class="setting"><div class="lab">Who holds the phone<small id="modeHint"></small></div>${GN.seg("mode", ["forehead", "clue"], cfg.mode, v => v === "forehead" ? "Guesser 🤳" : "Clue-giver 🗣️")}</div>
+      <div class="setting"><div class="lab">Forbidden words<small>Taboo-style. Say one of the four listed words and the card costs a point.</small></div>${GN.seg("taboo", [false, true], cfg.taboo, v => v ? "On" : "Off")}</div>
+      <div class="setting"><div class="lab">Turn length</div>${GN.seg("len", [45, 60, 90], cfg.len, v => v + "s")}</div>
+      <div class="setting"><div class="lab">Turns per ${GN.isPairs() ? "player" : "player"}<small id="turnHint"></small></div>${GN.seg("rounds", [1, 2, 3], cfg.rounds)}</div>
+      <div class="setting"><div class="lab">Passes per turn</div>${GN.seg("passes", [0, 3, 5], cfg.passes, v => v ? v : "∞")}</div>
+    </div>
+    <div class="card">
+      <div class="row between"><h3 style="margin:0">Decks</h3><span class="row"><button class="link small" id="all">All</button><button class="link small" id="none">None</button></span></div>
+      <p class="small muted" style="margin:4px 0 12px" id="deckCount"></p>
+      <div class="decks" id="decks"></div>
+    </div>
+    <button class="btn primary big block" id="go">Start the game</button>
+    <details class="card rules"><summary>Rules</summary>
+      <p><b>Guesser mode (classic).</b> Hold the phone sideways on your forehead, screen facing out. Your team clues you. <b>Tilt down</b> for correct and <b>tilt up</b> to pass. If tilting doesn't work on your phone, tap the right half for correct and the left half to pass.</p>
+      <p><b>Clue-giver mode.</b> The clue-giver holds the phone and describes. Tap <b>Got it</b>, <b>Pass</b>, or <b>Buzz</b> if a forbidden word slipped out.</p>
+      <p><b>Teams of 2.</b> One partner guesses and the other gives clues, then you swap next turn. Everyone else watches, and polices forbidden words if they're on.</p>
+      <p><b>Individuals.</b> Each player takes a turn guessing (or clue-giving) and everyone else helps. Your score is the cards you get through.</p>
+      <p><b>Scoring.</b> +1 per correct card, −1 per buzz. After each turn you can tap any word to fix a mistake.</p>
+    </details>
+  </div>`);
+  GN.rosterBlock(GN.$("#roster"), { onChange:hints });
+  GN.bindSegs(app, cfg, () => { save(); hints(); });
+  drawDecks(); hints();
+  GN.$("#all").onclick = () => { cfg.decks = DECKS.map(d => d.id); save(); drawDecks(); };
+  GN.$("#none").onclick = () => { cfg.decks = []; save(); drawDecks(); };
+  GN.$("#go").onclick = start;
+}
+function hints(){
+  const pairs = GN.isPairs();
+  GN.$("#modeHint").textContent = cfg.mode === "forehead" ? "Phone on the guesser's forehead; everyone else gives clues." : "Clue-giver holds the phone and describes; " + (pairs ? "their partner guesses." : "anyone can guess.");
+  const n = GN.roster().players.length;
+  GN.$("#turnHint").textContent = `${n * cfg.rounds} turns total, about ${Math.round(n * cfg.rounds * (cfg.len + 25) / 60)} min`;
+}
+function drawDecks(){
+  const el = GN.$("#decks");
+  el.innerHTML = DECKS.map(d => `<button class="deck" data-id="${d.id}" aria-pressed="${cfg.decks.includes(d.id)}"><span class="e">${d.emoji || "🃏"}</span><span><span class="n">${GN.esc(d.name)}</span><br><span class="c">${d.cards.length} cards</span></span></button>`).join("");
+  GN.$$(".deck", el).forEach(b => b.onclick = () => { const id = b.dataset.id; cfg.decks = cfg.decks.includes(id) ? cfg.decks.filter(x => x !== id) : [...cfg.decks, id]; save(); GN.sfx.tap(); drawDecks(); });
+  const total = DECKS.filter(d => cfg.decks.includes(d.id)).reduce((a, d) => a + d.cards.length, 0);
+  GN.$("#deckCount").textContent = `${cfg.decks.length} of ${DECKS.length} decks · ${total} cards in play`;
+  GN.$("#go").disabled = !cfg.decks.length;
+}
+
+/* ---------- game ---------- */
+function start(){
+  const sides = GN.sides();
+  if (sides.length < (GN.isPairs() ? 2 : 2)) { GN.toast("Add at least 2 players"); return; }
+  const pool = DECKS.filter(d => cfg.decks.includes(d.id)).flatMap(d => d.cards.map(c => ({ w:c[0], t:c.slice(1), deck:d.name, id:d.id + ":" + c[0] })));
+  const totalTurns = cfg.rounds * GN.roster().players.length;
+  G = { sides, scores:sides.map(() => 0), rot:GN.rotation(sides), dealer:GN.dealer("forehead", pool, c => c.id), turns:Math.max(sides.length, Math.round(totalTurns / sides.length) * sides.length), done:0 };
+  GN._wantWake = true; GN.wake(true);
+  if (cfg.mode === "forehead") askMotion();
+  nextTurn();
+}
+async function askMotion(){ try { if (typeof DeviceOrientationEvent !== "undefined" && DeviceOrientationEvent.requestPermission) await DeviceOrientationEvent.requestPermission(); } catch(e){} }
+
+function roles(){
+  const si = G.rot.side(), s = G.sides[si], me = G.rot.member(si), partner = G.rot.partner(si);
+  if (cfg.mode === "forehead") return { si, s, holder:me, guesser:me, cluer:partner || "everyone else", line:partner ? `${partner} gives the clues.` : "Everyone else gives clues." };
+  return { si, s, holder:me, guesser:partner || "everyone", cluer:me, line:partner ? `${partner} guesses. Nobody else helps!` : "Anyone can shout the answer." };
+}
+function nextTurn(){
+  if (G.done >= G.turns) return GN.finish({ gameId:"forehead", gameName:"Forehead", sides:G.sides, scores:G.scores, onRematch:start });
+  const R = roles();
+  GN.handoff({ to:R.holder, color:R.s.color, emoji:cfg.mode === "forehead" ? "🤳" : "🗣️",
+    msg:`${G.sides.length > 1 && R.s.members.length > 1 ? `<b>${GN.esc(R.s.name)}</b>: ` : ""}${cfg.mode === "forehead" ? "You're guessing. " : "You're giving clues. "}${GN.esc(R.line)}<br><span class="small">Turn ${G.done + 1} of ${G.turns}</span>`,
+    button:"Start my turn", onReady:() => {
+      if (cfg.mode === "forehead") { try { document.documentElement.requestFullscreen && document.documentElement.requestFullscreen().catch(() => {}); } catch(e){} try { screen.orientation && screen.orientation.lock && screen.orientation.lock("landscape").catch(() => {}); } catch(e){} }
+      GN.countdown(R.holder, cfg.mode === "forehead" ? "Phone on your forehead, screen facing out" : "Get ready to describe", playTurn);
+    } });
+}
+
+let T = null, cur = null, res = [], lock = false, passesUsed = 0, tilt = { armed:false, seen:false };
+function playTurn(){
+  const R = roles(); res = []; passesUsed = 0; lock = false; tilt = { armed:false, seen:false };
+  const clue = cfg.mode === "clue";
+  const el = GN.stage(`
+    <div class="hud"><span id="hs">0</span><span class="clock" id="clk">${cfg.len}</span><span id="hp">${cfg.passes ? cfg.passes + " passes" : ""}</span></div>
+    <div id="cardbox" style="position:relative;z-index:2;pointer-events:none"></div>
+    ${clue ? `<div class="cluebtns"><button style="background:#ffb36b" id="bPass">Pass</button><button style="background:#ff8a96" id="bFoul" ${cfg.taboo ? "" : "hidden"}>Buzz −1</button><button style="background:#7ff0b8;${cfg.taboo ? "" : "grid-column:span 2"}" id="bOk">Got it ✓</button></div>`
+      : `<div class="zones"><button id="zPass" aria-label="Pass">Pass</button><button id="zOk" aria-label="Correct">Correct</button></div>`}
+    <div class="ctrls">${!clue && cfg.taboo ? `<button id="bFoul2">Buzz −1</button>` : ""}<button id="bPause">Pause</button></div>
+    <div class="paused" id="paused" hidden><div class="display" style="font-size:44px">Paused</div><button class="btn primary" id="bResume">Resume</button><button class="btn ghost" id="bEnd">End turn now</button></div>
+    ${clue ? "" : `<div class="rot"><div style="font-size:60px">↻</div><div class="display" style="font-size:28px">Turn the phone sideways</div><p>Tap the sides if tilt doesn't work.</p></div>`}`, clue ? "" : "needland");
+  el.style.background = "var(--acc)"; el.style.color = "var(--acc-ink)";
+  el.style.userSelect = "none"; el.style.touchAction = "manipulation"; el.style.overflow = "hidden";
+  window.playEl = el;
+  nextCard();
+  T = GN.timer({ seconds:cfg.len, warn:5, onTick:left => { const c = GN.$("#clk"); if (c) { c.textContent = Math.ceil(left); c.classList.toggle("low", left <= 10); } }, onEnd:endTurn });
+  if (clue) { GN.$("#bOk").onclick = () => mark("ok"); GN.$("#bPass").onclick = () => mark("pass"); GN.$("#bFoul").onclick = () => mark("foul"); }
+  else { GN.$("#zOk").onclick = () => mark("ok"); GN.$("#zPass").onclick = () => mark("pass"); const f = GN.$("#bFoul2"); if (f) f.onclick = e => { e.stopPropagation(); mark("foul"); };
+    window.addEventListener("deviceorientation", onTilt); }
+  GN.$("#bPause").onclick = e => { e.stopPropagation(); T.pause(); GN.$("#paused").hidden = false; };
+  GN.$("#bResume").onclick = () => { T.resume(); GN.$("#paused").hidden = true; };
+  GN.$("#bEnd").onclick = () => { T.stop(); endTurn(); };
+}
+function nextCard(){
+  cur = G.dealer.next();
+  const long = cur.w.length > 16;
+  GN.$("#cardbox").innerHTML = `<div class="deckname">${GN.esc(cur.deck)}</div><div class="cardw${long ? " long" : ""}">${GN.esc(cur.w)}</div>
+    ${cfg.taboo && cur.t.length ? `<div class="taboo"><span class="lab" style="text-decoration:none;background:none">Don't say</span>${cur.t.map(w => `<span>${GN.esc(w)}</span>`).join("")}</div>` : ""}`;
+  window.playEl.classList.remove("ok", "pass", "foul");
+  window.playEl.style.background = "var(--acc)";
+}
+function mark(kind){
+  if (lock || !T || T.paused) return;
+  if (kind === "pass" && cfg.passes && passesUsed >= cfg.passes) { GN.toast("No passes left, keep going!"); GN.sfx.bad(); return; }
+  lock = true; if (kind === "pass") passesUsed++;
+  res.push({ w:cur.w, kind });
+  const colors = { ok:"var(--good)", pass:"#ff9f43", foul:"var(--bad)" };
+  window.playEl.style.background = colors[kind];
+  GN.$("#cardbox").innerHTML = `<div class="flash">${kind === "ok" ? "Correct!" : kind === "pass" ? "Pass" : "Buzz!"}</div>`;
+  if (kind === "ok") { GN.sfx.good(); GN.vibe(50); } else if (kind === "pass") { GN.sfx.pass(); GN.vibe([30, 40, 30]); } else { GN.sfx.alarm(); GN.vibe([200, 80, 200]); }
+  GN.$("#hs").textContent = res.filter(r => r.kind === "ok").length - res.filter(r => r.kind === "foul").length;
+  if (cfg.passes) GN.$("#hp").textContent = (cfg.passes - passesUsed) + " passes";
+  setTimeout(() => { lock = false; if (T && T.left > 0) nextCard(); }, kind === "foul" ? 1100 : 650);
+}
+/* Tilt: in landscape, |gamma| is ~90 when the phone is upright. beta tells us whether the screen
+   is tipping toward the ceiling (|beta| < 90) or the floor (|beta| > 90). */
+function onTilt(e){
+  if (e.beta == null || e.gamma == null) return;
+  tilt.seen = true;
+  const up = Math.abs(e.beta) < 90 ? 1 : -1;
+  const lean = up * (90 - Math.abs(e.gamma)); // + = screen to ceiling (pass), - = screen to floor (correct)
+  if (Math.abs(lean) < 22) { tilt.armed = true; return; }
+  if (!tilt.armed || lock) return;
+  if (lean <= -42) { tilt.armed = false; mark("ok"); }
+  else if (lean >= 42) { tilt.armed = false; mark("pass"); }
+}
+function endTurn(){
+  window.removeEventListener("deviceorientation", onTilt);
+  if (T) T.stop(); T = null; GN.sfx.buzz(); GN.vibe(300);
+  try { document.fullscreenElement && document.exitFullscreen(); } catch(e){}
+  try { screen.orientation && screen.orientation.unlock && screen.orientation.unlock(); } catch(e){}
+  if (lock && res.length && cur) {} // last card already logged
+  else if (cur && !res.some(r => r.w === cur.w)) res.push({ w:cur.w, kind:"pass", timeout:true });
+  review();
+}
+function review(){
+  const R = roles();
+  const draw = () => {
+    const ok = res.filter(r => r.kind === "ok").length, foul = res.filter(r => r.kind === "foul").length, pts = ok - foul;
+    GN.stage(`<div class="wrap" style="text-align:left;width:100%">
+      <div class="center"><div class="kicker">${GN.esc(R.s.name)}</div><div class="display" style="font-size:80px;color:var(--acc)">${pts > 0 ? "+" : ""}${pts}</div>
+      <p class="muted" style="margin:0">${ok} correct${foul ? `, ${foul} buzzed` : ""}${res.filter(r => r.kind === "pass").length ? `, ${res.filter(r => r.kind === "pass").length} passed` : ""}</p></div>
+      <p class="small muted center">Tap a word to fix it: correct → pass${cfg.taboo ? " → buzz" : ""}.</p>
+      <ul class="rev">${res.map((r, i) => `<li><button class="${r.kind}" data-i="${i}"><i></i>${GN.esc(r.w)}</button></li>`).join("") || `<li class="muted">No cards this turn.</li>`}</ul>
+      <div class="card" style="margin-top:16px">${GN.board(G.sides, G.scores.map((s, i) => i === R.si ? s + pts : s), { up:R.si })}</div>
+      <div class="btns"><button class="btn primary big" id="next">${G.done + 1 >= G.turns ? "Final scores 🏆" : "Next turn"}</button></div></div>`);
+    GN.$$(".rev button").forEach(b => b.onclick = () => { const r = res[+b.dataset.i]; const order = cfg.taboo ? ["ok", "pass", "foul"] : ["ok", "pass"]; r.kind = order[(order.indexOf(r.kind) + 1) % order.length]; GN.sfx.tap(); draw(); });
+    GN.$("#next").onclick = () => { G.scores[R.si] += pts; G.done++; G.rot.advance(); nextTurn(); };
+  };
+  draw();
+}
+setup();
+</script>
+</body>
+</html>

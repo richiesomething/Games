@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Fictionary · Parlor</title>
+<meta name="theme-color" content="#14111f">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📖</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,600;0,9..144,700;0,9..144,800;1,9..144,600&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/css/parlor.css">
+<style>
+.dword{font-family:var(--display);font-weight:800;font-size:clamp(40px,12vw,64px);line-height:1;letter-spacing:-.02em}
+.pos{font-family:var(--display);font-style:italic;color:var(--mute);font-size:18px}
+.defs{list-style:none;padding:0;margin:0;display:grid;gap:8px;text-align:left}
+.defs li{display:flex;gap:12px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px 14px;font-size:17px}
+.defs li b{font-family:var(--display);color:var(--acc);font-size:22px;line-height:1.1;min-width:22px}
+.defs li.real{border-color:var(--good);background:color-mix(in srgb,var(--good) 14%,var(--panel))}
+.defs li .by{display:block;font-size:13px;color:var(--mute);margin-top:4px;font-weight:700}
+.votes{display:flex;flex-wrap:wrap;gap:5px}
+.votes button{width:38px;height:38px;border-radius:10px;border:1.5px solid var(--line);font-weight:800}
+.votes button[aria-pressed="true"]{background:var(--acc);color:var(--acc-ink);border-color:transparent}
+.votes button:disabled{opacity:.25}
+.vrow{padding:10px 0;border-top:1px solid var(--line)} .vrow:first-child{border-top:0}
+.step{display:inline-flex;align-items:center;gap:6px}
+.step button{width:34px;height:34px;border-radius:10px;border:1.5px solid var(--line);font-weight:800;font-size:18px}
+.step b{min-width:20px;text-align:center;font-family:var(--display);font-size:20px}
+.mark{border:1.5px solid var(--line);border-radius:10px;padding:6px 10px;font-weight:700;font-size:13px}
+.mark[aria-pressed="true"]{background:var(--good);color:#032015;border-color:transparent}
+</style>
+</head>
+<body>
+<main class="wrap" id="app"></main>
+<script src="../assets/data/fictionary.js"></script>
+<script src="../assets/js/parlor.js"></script>
+<script>
+const app = GN.page({ title:"Fictionary", accent:"#5eead4", accentInk:"#032a24" });
+const WORDS = (window.GN_DATA && GN_DATA.words) || [];
+const cfg = Object.assign({ mode:"type", rounds:1, timer:120 }, GN.get("fictionary.cfg", {}));
+const save = () => GN.set("fictionary.cfg", cfg);
+let G = null;
+
+function setup(){
+  GN.render(`<div class="stack">
+    <div><div class="kicker">Bluffing · wordplay</div><h1>Fictionary</h1>
+    <p class="lede">A real but wildly obscure word. Everyone writes a fake definition that sounds right. Then find the real one among the fakes, and fool as many friends as you can.</p></div>
+    <div class="card center"><div class="dword" style="font-size:40px">Groak</div><div class="pos">verb</div>
+      <p class="small muted" style="margin:8px 0 0">Is it (a) to croak like a frog with a cold, (b) to watch silently while someone eats, hoping they'll share, or (c) a Norse wool cloak?</p></div>
+    <div id="roster"></div>
+    <div class="card">
+      <h3>Settings</h3>
+      <div class="setting"><div class="lab">Writing fakes<small id="mh"></small></div>${GN.seg("mode", ["type", "paper"], cfg.mode, v => v === "type" ? "Type on this phone" : "Pen & paper")}</div>
+      <div class="setting"><div class="lab">Turns as reader<small>How many words each side presents.</small></div>${GN.seg("rounds", [1, 2, 3], cfg.rounds)}</div>
+      ${cfg.mode === "paper" ? `<div class="setting"><div class="lab">Writing timer</div>${GN.seg("timer", [0, 90, 120, 180], cfg.timer, v => v ? v / 60 + " min" : "Off")}</div>` : ""}
+    </div>
+    <button class="btn primary big block" id="go">Start</button>
+    <details class="card rules"><summary>Rules & scoring</summary>
+      <ol>
+        <li>The <b>reader</b> secretly sees the word and its real definition, then announces the word and spells it out.</li>
+        <li>Everyone else writes a believable fake definition. Match the dictionary style!</li>
+        <li>The reader mixes in the real one and reads every definition aloud, with a straight face.</li>
+        <li>On three, everyone points at (or holds up fingers for) the definition they believe.</li>
+      </ol>
+      <p><b>+2</b> for picking the real definition. <b>+1</b> for each person fooled by your fake. <b>+3</b> to the reader if nobody finds the real one. Wrote something basically correct? <b>+3</b> and it's taken out before reading.</p>
+      <p>${WORDS.length} words in the pool.</p>
+    </details>
+  </div>`);
+  GN.rosterBlock(GN.$("#roster"), { minSides:3, note:"Best with 4+ sides. The more fakes, the harder it is to spot the real one." });
+  GN.bindSegs(app, cfg, () => { save(); setup(); });
+  GN.$("#mh").textContent = cfg.mode === "type" ? "Pass the phone. Definitions get shuffled and scored automatically." : "Each side writes on paper and the reader collects them. The phone keeps score.";
+  GN.$("#go").onclick = start;
+}
+function start(){
+  const sides = GN.sides(); if (sides.length < 3) return GN.toast("Fictionary needs at least 3 sides");
+  G = { sides, scores:sides.map(() => 0), turn:0, total:sides.length * cfg.rounds, dealer:GN.dealer("fictionary", WORDS, w => w.w) };
+  GN._wantWake = true; GN.wake(true);
+  turn();
+}
+const others = ri => G.sides.map((_, i) => i).filter(i => i !== ri);
+function turn(){
+  if (G.turn >= G.total) return GN.finish({ gameId:"fictionary", gameName:"Fictionary", sides:G.sides, scores:G.scores, onRematch:start });
+  const ri = G.turn % G.sides.length, s = G.sides[ri];
+  GN.handoff({ to:s.name, color:s.color, emoji:"📖", msg:"You're the reader. The real definition is on the next screen. Keep it hidden.", button:"Show me the word", onReady:() => reader(ri, G.dealer.next(), 2) });
+}
+function reader(ri, W, skips){
+  GN.stage(`<div class="wrap" style="width:100%">
+    <div class="kicker">Reader only</div>
+    <div class="dword" style="margin-top:16px">${GN.esc(W.w)}</div><div class="pos">${GN.esc(W.pos || "")}</div>
+    <div class="card" style="margin:18px 0;text-align:left"><div class="small muted">Real definition</div><div style="font-size:19px;font-weight:700;margin-top:4px">${GN.esc(W.d)}</div></div>
+    <p class="small muted">Already know this word? Skip it.</p>
+    <div class="btns two"><button class="btn" id="skip" ${skips ? "" : "disabled"}>Skip (${skips})</button><button class="btn primary" id="ok">Announce it</button></div></div>`);
+  GN.$("#skip").onclick = () => reader(ri, G.dealer.next(), skips - 1);
+  GN.$("#ok").onclick = () => announce(ri, W);
+}
+function announce(ri, W){
+  GN.stage(`<div class="wrap" style="width:100%">
+    <div class="kicker">Today's word</div><div class="dword" style="margin:14px 0 4px">${GN.esc(W.w)}</div><div class="pos">${GN.esc(W.pos || "")}</div>
+    <p class="lede" style="margin:18px auto">${cfg.mode === "type" ? "Everyone except the reader will type a fake definition, one at a time." : "Everyone except the reader: write a fake definition on paper and hand it to the reader."}</p>
+    <div class="btns">${cfg.mode === "type" ? `<button class="btn primary big" id="ok">Start writing</button>` : `<button class="btn primary big" id="ok">${cfg.timer ? "Start the " + cfg.timer / 60 + "-minute timer" : "Everyone's written"}</button>`}</div></div>`);
+  GN.$("#ok").onclick = () => cfg.mode === "type" ? writeFake(ri, W, 0, []) : paperTimer(ri, W);
+}
+/* ---------- typing mode ---------- */
+function writeFake(ri, W, k, fakes){
+  const ws = others(ri);
+  if (k >= ws.length) return review(ri, W, fakes);
+  const si = ws[k], s = G.sides[si];
+  GN.handoff({ to:s.name, color:s.color, emoji:"✍️", msg:`Write a fake definition for <b>${GN.esc(W.w)}</b> <i>(${GN.esc(W.pos || "")})</i>.`, button:"Write mine", onReady:() => {
+    const el = GN.stage(`<div class="wrap" style="width:100%;text-align:left">
+      <div class="kicker">${GN.esc(s.name)} · secret</div><div class="dword" style="font-size:40px;margin:8px 0 2px">${GN.esc(W.w)}</div><div class="pos">${GN.esc(W.pos || "")}</div>
+      <textarea class="input" id="d" maxlength="160" placeholder="Sound like a dictionary…" style="margin-top:14px"></textarea>
+      <p class="tiny muted">Tip: copy the style. Short, confident, slightly boring.</p>
+      <div class="btns"><button class="btn primary big" id="ok" disabled>Submit</button></div></div>`);
+    const d = GN.$("#d", el); d.oninput = () => GN.$("#ok").disabled = d.value.trim().length < 3; setTimeout(() => d.focus(), 80);
+    GN.$("#ok").onclick = () => { let t = d.value.trim(); t = t[0].toUpperCase() + t.slice(1); if (!/[.!?]$/.test(t)) t += "."; fakes.push({ si, d:t, right:false }); GN.sfx.good(); writeFake(ri, W, k + 1, fakes); };
+  } });
+}
+function review(ri, W, fakes){
+  GN.handoff({ to:G.sides[ri].name, color:G.sides[ri].color, emoji:"🧐", msg:"Check the fakes in private before you read them aloud.", button:"Review fakes", onReady:() => {
+    const draw = () => {
+      GN.stage(`<div class="wrap" style="width:100%;text-align:left">
+        <div class="kicker">Reader only</div><h2 style="margin:6px 0">Any basically correct?</h2>
+        <p class="small muted">Real: <b style="color:var(--ink)">${GN.esc(W.d)}</b><br>Mark any fake that's essentially right. It's worth +3 and gets taken out.</p>
+        <div class="defs">${fakes.map((f, i) => `<li><div class="grow">${GN.esc(f.d)}<span class="by">${GN.esc(G.sides[f.si].name)}</span></div><button class="mark" data-i="${i}" aria-pressed="${f.right}">${f.right ? "✓ Correct" : "Correct?"}</button></li>`).join("")}</div>
+        <div class="btns"><button class="btn primary big" id="ok">Shuffle & read aloud</button></div></div>`);
+      GN.$$(".mark").forEach(b => b.onclick = () => { const f = fakes[+b.dataset.i]; f.right = !f.right; draw(); });
+      GN.$("#ok").onclick = () => readAloud(ri, W, fakes);
+    };
+    draw();
+  } });
+}
+function readAloud(ri, W, fakes){
+  const list = GN.shuffle([{ real:true, d:W.d }, ...fakes.filter(f => !f.right)]);
+  GN.stage(`<div class="wrap" style="width:100%">
+    <div class="kicker">${GN.esc(G.sides[ri].name)}, read these out</div>
+    <div class="dword" style="font-size:40px;margin:8px 0 2px">${GN.esc(W.w)}</div><div class="pos" style="margin-bottom:14px">${GN.esc(W.pos || "")}</div>
+    <ol class="defs">${list.map((x, i) => `<li><b>${i + 1}</b><span>${GN.esc(x.d)}</span></li>`).join("")}</ol>
+    <p class="muted">On three, everyone holds up fingers for the definition they believe. You can't vote for your own.</p>
+    <div class="btns"><button class="btn primary big" id="ok">Enter votes</button></div></div>`);
+  GN.$("#ok").onclick = () => voting(ri, W, fakes, list);
+}
+function voting(ri, W, fakes, list){
+  const votes = {}; const voters = others(ri);
+  const own = si => list.findIndex(x => x.si === si);
+  const draw = () => {
+    GN.stage(`<div class="wrap" style="width:100%;text-align:left">
+      <div class="kicker center">Who voted for which?</div>
+      <div class="card" style="margin-top:12px">${voters.map(si => `<div class="vrow"><div style="margin-bottom:6px">${GN.sidePill(G.sides[si])}</div>
+        <div class="votes">${list.map((x, i) => `<button data-s="${si}" data-v="${i}" aria-pressed="${votes[si] === i}" ${own(si) === i ? "disabled" : ""}>${i + 1}</button>`).join("")}</div></div>`).join("")}</div>
+      <div class="btns"><button class="btn primary big" id="ok" ${voters.every(si => votes[si] != null) ? "" : "disabled"}>Reveal the truth</button></div></div>`);
+    GN.$$(".votes button").forEach(b => b.onclick = () => { votes[b.dataset.s] = +b.dataset.v; GN.sfx.tap(); draw(); });
+    GN.$("#ok").onclick = () => {
+      const delta = G.sides.map(() => 0); let found = 0;
+      fakes.filter(f => f.right).forEach(f => delta[f.si] += 3);
+      voters.forEach(si => { const pick = list[votes[si]]; if (pick.real) { delta[si] += 2; found++; } else delta[pick.si] += 1; });
+      if (!found) delta[ri] += 3;
+      settle(ri, W, delta, list, votes, found);
+    };
+  };
+  draw();
+}
+/* ---------- paper mode ---------- */
+function paperTimer(ri, W){
+  if (!cfg.timer) return paperTally(ri, W);
+  let T;
+  GN.stage(`<div class="wrap" style="width:100%"><div class="dword" style="font-size:40px">${GN.esc(W.w)}</div><div class="pos">${GN.esc(W.pos || "")}</div>
+    <div class="clock" id="clk" style="font-size:90px;margin:20px 0">${GN.fmtTime(cfg.timer)}</div>
+    <div class="btns"><button class="btn primary big" id="ok">Everyone's done</button></div></div>`);
+  T = GN.timer({ seconds:cfg.timer, warn:10, onTick:l => { const c = GN.$("#clk"); if (c) { c.textContent = GN.fmtTime(l); c.classList.toggle("low", l <= 15); } }, onEnd:() => { GN.sfx.buzz(); GN.toast("Pens down!"); } });
+  GN.$("#ok").onclick = () => { T.stop(); paperTally(ri, W); };
+}
+function paperTally(ri, W){
+  const st = {}; others(ri).forEach(si => st[si] = { found:false, fooled:0, right:false });
+  const draw = () => {
+    GN.stage(`<div class="wrap" style="width:100%;text-align:left">
+      <div class="kicker center">Reader: shuffle the slips with the real one and read them all out. Then vote and tally.</div>
+      <div class="card" style="margin-top:12px">${others(ri).map(si => `<div class="vrow"><div class="row between">${GN.sidePill(G.sides[si])}<button class="mark" data-r="${si}" aria-pressed="${st[si].right}">Basically right +3</button></div>
+        <div class="row between" style="margin-top:8px"><button class="mark" data-f="${si}" aria-pressed="${st[si].found}">${st[si].found ? "✓ Found the real one" : "Found the real one?"}</button>
+        <span class="step"><span class="small muted">fooled</span><button data-m="${si}">−</button><b>${st[si].fooled}</b><button data-p="${si}">+</button></span></div></div>`).join("")}</div>
+      <div class="btns"><button class="btn primary big" id="ok">Score it</button></div></div>`);
+    GN.$$("[data-r]").forEach(b => b.onclick = () => { st[b.dataset.r].right = !st[b.dataset.r].right; draw(); });
+    GN.$$("[data-f]").forEach(b => b.onclick = () => { st[b.dataset.f].found = !st[b.dataset.f].found; draw(); });
+    GN.$$("[data-m]").forEach(b => b.onclick = () => { st[b.dataset.m].fooled = Math.max(0, st[b.dataset.m].fooled - 1); draw(); });
+    GN.$$("[data-p]").forEach(b => b.onclick = () => { st[b.dataset.p].fooled++; draw(); });
+    GN.$("#ok").onclick = () => {
+      const delta = G.sides.map(() => 0); let found = 0;
+      Object.entries(st).forEach(([si, x]) => { delta[si] += (x.found ? 2 : 0) + x.fooled + (x.right ? 3 : 0); if (x.found) found++; });
+      if (!found) delta[ri] += 3;
+      settle(ri, W, delta, null, null, found);
+    };
+  };
+  draw();
+}
+function settle(ri, W, delta, list, votes, found){
+  delta.forEach((d, i) => G.scores[i] += d); G.turn++;
+  found ? GN.sfx.good() : GN.sfx.win();
+  const tally = list ? list.map((x, i) => ({ x, n:Object.values(votes).filter(v => v === i).length })) : null;
+  GN.stage(`<div class="wrap" style="width:100%">
+    <div class="kicker">${GN.esc(W.w)} really means</div>
+    <div class="card" style="margin:12px 0;font-size:19px;font-weight:700">${GN.esc(W.d)}</div>
+    <p>${found ? `${found} found the real one.` : `Nobody found it! ${GN.esc(G.sides[ri].name)} gets +3.`}</p>
+    ${tally ? `<ol class="defs">${tally.map(({ x, n }, i) => `<li class="${x.real ? "real" : ""}"><b>${i + 1}</b><span class="grow">${GN.esc(x.d)}<span class="by">${x.real ? "✓ The real one" : "by " + GN.esc(G.sides[x.si].name)} · ${n} vote${n === 1 ? "" : "s"}</span></span></li>`).join("")}</ol>` : ""}
+    <div class="card" style="text-align:left;margin-top:14px">${GN.board(G.sides, G.scores, { delta })}</div>
+    <div class="btns"><button class="btn primary big" id="next">${G.turn >= G.total ? "Final scores 🏆" : "Next reader"}</button></div></div>`);
+  GN.$("#next").onclick = turn;
+}
+setup();
+</script>
+</body>
+</html>

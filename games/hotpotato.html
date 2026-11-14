@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Hot Potato · Parlor</title>
+<meta name="theme-color" content="#14111f">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💣</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700;9..144,800&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/css/parlor.css">
+<style>
+.prompt{font-family:var(--display);font-weight:800;font-size:clamp(32px,9vw,54px);line-height:1.05;max-width:16ch;margin:0 auto;text-wrap:balance}
+.letterpill{display:inline-block;margin-top:14px;background:var(--ink);color:var(--bg);border-radius:14px;padding:4px 16px;font-family:var(--display);font-weight:800;font-size:28px}
+.spark{width:26px;height:26px;border-radius:50%;background:var(--acc);box-shadow:0 0 22px 8px color-mix(in srgb,var(--acc) 60%,transparent);margin:0 auto 22px;animation:spark .6s infinite alternate}
+@keyframes spark{from{transform:scale(.6)}to{transform:scale(1.3)}}
+.boom{animation:quake .5s}
+@keyframes quake{0%,100%{transform:translate(0)}20%{transform:translate(-10px,6px)}40%{transform:translate(9px,-6px)}60%{transform:translate(-7px,4px)}80%{transform:translate(5px,-3px)}}
+.lives{display:inline-flex;gap:4px;margin-left:6px}
+.lives i{width:10px;height:10px;border-radius:50%;background:currentColor;opacity:.25}
+.lives i.on{opacity:1}
+.sidebtn.out{opacity:.3;text-decoration:line-through}
+</style>
+</head>
+<body>
+<main class="wrap" id="app"></main>
+<script src="../assets/data/hotpotato.js"></script>
+<script src="../assets/js/parlor.js"></script>
+<script>
+const app = GN.page({ title:"Hot Potato", accent:"#ff5d6c", accentInk:"#2a0308" });
+const PROMPTS = (window.GN_DATA && GN_DATA.hotpotato) || [];
+const FUSE = { short:[10, 25], mid:[15, 40], long:[25, 60] };
+const EASY = "ABCDEFGHIJKLMNOPRSTW";
+const cfg = Object.assign({ lives:3, fuse:"mid", tier:"mix", letter:false }, GN.get("hotpotato.cfg", {}));
+const save = () => GN.set("hotpotato.cfg", cfg);
+let G = null;
+
+function setup(){
+  GN.render(`<div class="stack">
+    <div><div class="kicker">Loud · fast · panicky</div><h1>Hot Potato</h1>
+    <p class="lede">A prompt appears. Shout a valid answer and pass the phone to the next person. The fuse length is secret. Whoever's holding it when it blows loses a life.</p></div>
+    <div id="roster"></div>
+    <div class="card">
+      <h3>Settings</h3>
+      <div class="setting"><div class="lab">Lives</div>${GN.seg("lives", [2, 3, 5], cfg.lives)}</div>
+      <div class="setting"><div class="lab">Fuse<small>Longer fuses mean more laps around the circle.</small></div>${GN.seg("fuse", ["short", "mid", "long"], cfg.fuse, v => ({ short:"Short", mid:"Medium", long:"Long" })[v])}</div>
+      <div class="setting"><div class="lab">Prompt difficulty</div>${GN.seg("tier", ["mix", 1, 2, 3], cfg.tier, v => ({ mix:"Mix", 1:"Easy", 2:"Medium", 3:"Hard" })[v])}</div>
+      <div class="setting"><div class="lab">Letter twist<small>Some easy prompts get a starting letter: "A country… starting with B".</small></div>${GN.seg("letter", [false, true], cfg.letter, v => v ? "On" : "Off")}</div>
+    </div>
+    <button class="btn primary big block" id="go">Light the fuse</button>
+    <details class="card rules"><summary>Rules</summary>
+      <ol>
+        <li>Sit in a circle. ${GN.isPairs() ? "Teammates sit <b>apart</b>. If it blows on either of you, your team loses a life." : ""}</li>
+        <li>The holder shouts one answer that fits the prompt, then passes the phone to their left. No repeats.</li>
+        <li>The group can shout <b>"BOGUS!"</b> at a bad answer, and the holder has to try again.</li>
+        <li>When it explodes, tap whoever was holding it. Lose all your lives and you're out, so skip over that person when passing.</li>
+        <li>${PROMPTS.length} prompts. The ticking speeds up, but that tells you nothing about when it'll blow.</li>
+      </ol>
+    </details>
+  </div>`);
+  GN.rosterBlock(GN.$("#roster"));
+  GN.bindSegs(app, cfg, () => { save(); setup(); });
+  GN.$("#go").onclick = start;
+}
+function start(){
+  const sides = GN.sides(); if (sides.length < 2) return GN.toast("Need at least 2 sides");
+  const pool = cfg.tier === "mix" ? PROMPTS : PROMPTS.filter(p => p.tier === cfg.tier);
+  G = { sides, lives:sides.map(() => cfg.lives), out:[], dealer:GN.dealer("hotpotato." + cfg.tier, pool.length ? pool : PROMPTS, p => p.p), booms:0 };
+  GN._wantWake = true; GN.wake(true);
+  GN.audio();
+  next();
+}
+const alive = () => G.sides.map((_, i) => i).filter(i => G.lives[i] > 0);
+function next(){
+  let P = G.dealer.next(); let text = P.p, letter = null;
+  if (cfg.letter && P.tier === 1 && Math.random() < .55) letter = GN.pick(EASY.split(""));
+  GN.countdown("Get in a circle", "First holder: get ready to shout", () => fuse(text, letter));
+}
+let raf = null;
+function fuse(text, letter){
+  const [lo, hi] = FUSE[cfg.fuse]; const len = (lo + Math.random() * (hi - lo)) * 1000;
+  const t0 = performance.now(); let nextTick = t0, running = true;
+  const el = GN.stage(`<div style="width:100%">
+    <div class="spark" id="sp"></div>
+    <div class="prompt">${GN.esc(text)}</div>
+    ${letter ? `<div class="letterpill">starting with ${letter}</div>` : ""}
+    <p class="muted" style="margin-top:24px">Say it, pass it. No repeats.</p>
+    <div class="row" style="justify-content:center;margin-top:20px"><button class="btn sm ghost" id="skip">Too hard? New prompt</button></div></div>`);
+  GN.$("#skip", el).onclick = () => { const P = G.dealer.next(); GN.$(".prompt", el).textContent = P.p; text = P.p; const lp = GN.$(".letterpill", el); if (lp) lp.remove(); letter = null; GN.sfx.tap(); };
+  const loop = now => {
+    if (!running) return;
+    const e = (now - t0) / 1000;
+    const iv = Math.max(85, 620 * Math.pow(.955, e * 3)); // tempo rises with time only
+    if (now >= nextTick) { GN.tone(900 + e * 15, .03, "square", .18); nextTick = now + iv; const sp = GN.$("#sp"); if (sp) sp.style.animationDuration = Math.max(.1, iv / 1000) + "s"; }
+    if (now - t0 >= len) { running = false; return boom(text, letter); }
+    raf = requestAnimationFrame(loop);
+  };
+  raf = requestAnimationFrame(loop);
+}
+function boom(text, letter){
+  GN.sfx.boom(); GN.vibe([100, 50, 250]);
+  const el = GN.stage(`<div class="wrap boom" style="width:100%">
+    <div style="font-size:90px;line-height:1">💥</div><h1 style="font-size:64px;color:var(--acc)">BOOM</h1>
+    <p class="muted">“${GN.esc(text)}${letter ? " starting with " + letter : ""}”</p>
+    <p><b>Who was holding it?</b></p>
+    <div class="sidegrid">${G.sides.map((s, i) => `<button class="sidebtn${G.lives[i] ? "" : " out"}" data-i="${i}" style="--sc:${s.color}" ${G.lives[i] ? "" : "disabled"}>${GN.esc(s.name)}<small>${livesHTML(i)}</small></button>`).join("")}</div>
+    <div class="btns"><button class="btn ghost" id="redo">Nobody, it was a mess. Redo.</button></div></div>`);
+  el.style.background = "color-mix(in srgb, var(--acc) 22%, var(--bg))";
+  GN.$$("[data-i]", el).forEach(b => b.onclick = () => strike(+b.dataset.i));
+  GN.$("#redo", el).onclick = next;
+}
+const livesHTML = i => `<span class="lives">${Array.from({ length:cfg.lives }, (_, k) => `<i class="${k < G.lives[i] ? "on" : ""}"></i>`).join("")}</span>`;
+function strike(i){
+  G.lives[i]--; G.booms++; GN.sfx.bad();
+  if (!G.lives[i]) G.out.push(i);
+  const left = alive();
+  if (left.length <= 1) {
+    // rank by survival: first out = 1 point, … winner gets the most
+    const scores = G.sides.map(() => 0); G.out.forEach((si, k) => scores[si] = k + 1); left.forEach(si => scores[si] = G.out.length + 1 + G.lives[si]);
+    return GN.finish({ gameId:"hotpotato", gameName:"Hot Potato", sides:G.sides, scores, onRematch:start, note:`${G.booms} explosions. Score = how long you survived.` });
+  }
+  GN.stage(`<div class="wrap" style="width:100%">
+    <div class="kicker">${G.lives[i] ? "Ouch" : "Eliminated"}</div><h2 style="margin:6px 0 14px">${GN.esc(G.sides[i].name)} ${G.lives[i] ? `has ${G.lives[i]} li${G.lives[i] === 1 ? "fe" : "ves"} left` : "is out!"}</h2>
+    <div class="board">${G.sides.map((s, k) => `<div class="srow" style="--sc:${s.color};${G.lives[k] ? "" : "opacity:.4"}"><div class="nm">${GN.esc(s.name)}</div>${livesHTML(k)}</div>`).join("")}</div>
+    <p class="muted">${GN.esc(G.sides[i].name)} ${G.lives[i] ? "starts" : "is out. The next player starts"} the next round.</p>
+    <div class="btns"><button class="btn primary big" id="nx">Next prompt</button></div></div>`);
+  GN.$("#nx").onclick = next;
+}
+setup();
+</script>
+</body>
+</html>

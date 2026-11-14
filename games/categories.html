@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Categories · Parlor</title>
+<meta name="theme-color" content="#14111f">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📝</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700;9..144,800&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/css/parlor.css">
+<style>
+.letter{font-family:var(--display);font-weight:800;font-size:clamp(120px,40vw,200px);line-height:1;width:1.15em;height:1.2em;display:grid;place-items:center;margin:10px auto;
+  background:var(--acc);color:var(--acc-ink);border-radius:30px;box-shadow:0 10px 0 rgba(0,0,0,.3)}
+.letter.spin{animation:wob .1s infinite alternate}
+@keyframes wob{to{transform:rotate(3deg) scale(.97)}}
+.clist{list-style:none;margin:0;padding:0;counter-reset:c;display:grid;gap:6px}
+.clist li{counter-increment:c;display:flex;gap:12px;align-items:baseline;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 14px;font-weight:700;text-align:left}
+.clist li::before{content:counter(c);font-family:var(--display);color:var(--acc);font-weight:800;min-width:22px}
+.code{font-family:var(--display);font-weight:800;font-size:30px;letter-spacing:.12em}
+.minilet{display:inline-grid;place-items:center;width:52px;height:56px;border-radius:14px;background:var(--acc);color:var(--acc-ink);font-family:var(--display);font-weight:800;font-size:34px}
+.sticky{position:sticky;top:0;z-index:5;background:var(--bg);padding:10px 0}
+.catname{font-family:var(--display);font-weight:800;font-size:clamp(26px,7vw,36px);line-height:1.1;margin:8px 0 4px}
+</style>
+</head>
+<body>
+<main class="wrap" id="app"></main>
+<script src="../assets/data/categories.js"></script>
+<script src="../assets/js/parlor.js"></script>
+<script>
+const app = GN.page({ title:"Categories", accent:"#7ae582", accentInk:"#062a10" });
+const CATS = (window.GN_DATA && GN_DATA.categories) || [];
+const EASY = "ABCDEFGHIJKLMNOPRSTW", ALL = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+const cfg = Object.assign({ count:12, time:180, rounds:3, hard:false }, GN.get("categories.cfg", {}));
+const save = () => GN.set("categories.cfg", cfg);
+const CODECH = "ABCDEFGHJKMNPQRSTVWXYZ";
+let G = null;
+
+/* A round is fully determined by its code, so other phones can show the same list. */
+function makeCode(){ return Array.from({ length:4 }, () => GN.pick(CODECH.split(""))).join("") + String(cfg.count).padStart(2, "0") + (cfg.hard ? "H" : ""); }
+function fromCode(code){
+  code = code.toUpperCase().replace(/[^A-Z0-9]/g, "");
+  const m = code.match(/^([A-Z]{4})(\d{2})(H?)$/); if (!m) return null;
+  const r = GN.rng("parlor-cat-" + m[1]); const count = GN.clamp(+m[2], 4, 20);
+  const letters = m[3] ? ALL : EASY;
+  const letter = letters[Math.floor(r() * letters.length)];
+  const cats = GN.seededShuffle(CATS, r).slice(0, count);
+  return { code:m[1] + m[2] + m[3], letter, cats };
+}
+const pretty = c => c.slice(0, 4) + "·" + c.slice(4);
+
+function setup(){
+  GN.render(`<div class="stack">
+    <div><div class="kicker">Wordplay · pens & paper</div><h1>Categories</h1>
+    <p class="lede">One letter, a list of categories, and a ticking clock. Write an answer for each one that starts with the letter. Only answers nobody else wrote will score.</p></div>
+    <div id="roster"></div>
+    <div class="card">
+      <h3>Settings</h3>
+      <div class="setting"><div class="lab">Categories per round</div>${GN.seg("count", [8, 10, 12, 15], cfg.count)}</div>
+      <div class="setting"><div class="lab">Time to write</div>${GN.seg("time", [120, 180, 240], cfg.time, v => v / 60 + " min")}</div>
+      <div class="setting"><div class="lab">Rounds</div>${GN.seg("rounds", [1, 2, 3, 4], cfg.rounds)}</div>
+      <div class="setting"><div class="lab">Hard letters<small>Allow Q, U, V, X, Y, Z</small></div>${GN.seg("hard", [false, true], cfg.hard, v => v ? "On" : "Off")}</div>
+    </div>
+    <div class="note">📝 Each ${GN.isPairs() ? "team" : "player"} needs paper and a pen, or a notes app. Number your lines 1 to ${cfg.count}. ${GN.isPairs() ? "Partners write one shared list." : ""}</div>
+    <button class="btn primary big block" id="go">Roll the first letter</button>
+    <div class="card">
+      <h3>Following on another phone?</h3>
+      <p class="small muted" style="margin:0 0 10px">Every round has a code. Enter it to see the same letter and list on your own phone. (${CATS.length} categories in the pool.)</p>
+      <div class="row"><input class="input grow" id="jc" placeholder="e.g. KQPT·12" maxlength="9" autocomplete="off" autocapitalize="characters" style="width:auto"><button class="btn" id="join">Join</button></div>
+    </div>
+    <details class="card rules"><summary>Rules & scoring</summary>
+      <ol>
+        <li>Roll a letter. Everyone writes one answer per category, starting with that letter, before time runs out.</li>
+        <li>Then go through the list one category at a time. Each side reads its answer out loud.</li>
+        <li><b>1 point</b> for a valid answer that no other side wrote. Matching answers cancel each other out.</li>
+        <li><b>2 points</b> for alliteration, where most of the words start with the letter ("Bob's Burgers" for B). Tap a side twice to give it 2.</li>
+        <li>The group rules on anything sketchy. Majority wins, and leaning on puns is allowed.</li>
+      </ol>
+    </details>
+  </div>`);
+  GN.rosterBlock(GN.$("#roster"));
+  GN.bindSegs(app, cfg, () => { save(); setup(); });
+  GN.$("#go").onclick = start;
+  const j = () => { const R = fromCode(GN.$("#jc").value); if (!R) return GN.toast("That code doesn't look right"); follow(R); };
+  GN.$("#join").onclick = j; GN.$("#jc").onkeydown = e => { if (e.key === "Enter") j(); };
+}
+
+/* follower phone: just the letter, the list and a timer */
+function follow(R){
+  let T = null;
+  GN.render(`<div class="center"><div class="kicker">Round ${pretty(R.code)}</div><div class="letter">${R.letter}</div></div>
+    <div class="sticky row between"><span class="minilet">${R.letter}</span><span class="clock" id="clk" style="font-size:34px">${GN.fmtTime(cfg.time)}</span><button class="btn sm" id="t">Start timer</button></div>
+    <ol class="clist">${R.cats.map(c => `<li>${GN.esc(c)}</li>`).join("")}</ol>
+    <div class="btns"><button class="btn" id="leave">Leave</button></div>`);
+  GN.$("#t").onclick = () => { if (T) return; T = GN.timer({ seconds:cfg.time, warn:10, onTick:l => { const c = GN.$("#clk"); if (c) { c.textContent = GN.fmtTime(l); c.classList.toggle("low", l <= 15); } }, onEnd:() => { GN.sfx.buzz(); GN.vibe(400); } }); GN.$("#t").disabled = true; };
+  GN.$("#leave").onclick = () => { if (T) T.stop(); setup(); };
+}
+
+function start(){
+  const sides = GN.sides(); if (sides.length < 2) return GN.toast("Need at least 2 sides");
+  G = { sides, scores:sides.map(() => 0), round:0, used:new Set() };
+  GN._wantWake = true; GN.wake(true);
+  roll();
+}
+function roll(){
+  let R, tries = 0; do { R = fromCode(makeCode()); tries++; } while (G.used.has(R.letter) && tries < 40);
+  G.used.add(R.letter); G.R = R;
+  const box = GN.stage(`<div class="wrap" style="width:100%">
+    <div class="kicker">Round ${G.round + 1} of ${cfg.rounds}</div>
+    <div class="letter spin" id="L">?</div>
+    <div id="after" style="opacity:0;transition:.3s">
+      <p class="muted" style="margin:0">Code for other phones</p><div class="code">${pretty(R.code)}</div>
+      <div class="btns"><button class="btn primary big" id="go">Show the list & start ${GN.fmtTime(cfg.time)}</button></div></div></div>`);
+  let n = 0; const L = GN.$("#L", box);
+  (function spin(){ if (!L.isConnected) return; if (n < 18) { L.textContent = ALL[Math.random() * 26 | 0]; GN.tone(400 + Math.random() * 400, .03, "triangle", .05); n++; setTimeout(spin, 40 + n * n * .7); }
+    else { L.textContent = R.letter; L.classList.remove("spin"); GN.sfx.good(); GN.$("#after").style.opacity = 1; } })();
+  GN.$("#go").onclick = writing;
+}
+function writing(){
+  const R = G.R; let T;
+  GN.stage(`<div class="wrap" style="width:100%;text-align:left">
+    <div class="sticky row between"><span class="minilet">${R.letter}</span><span class="clock" id="clk" style="font-size:40px">${GN.fmtTime(cfg.time)}</span><button class="btn sm" id="pz">Pause</button></div>
+    <div class="tbar" style="margin-bottom:12px"><i id="bar"></i></div>
+    <ol class="clist">${R.cats.map(c => `<li>${GN.esc(c)}</li>`).join("")}</ol>
+    <p class="small muted center">Code ${pretty(R.code)}</p>
+    <div class="btns"><button class="btn" id="done">Everyone's done, stop early</button></div></div>`);
+  T = GN.timer({ seconds:cfg.time, warn:10, onTick:l => { const c = GN.$("#clk"); if (!c) return; c.textContent = GN.fmtTime(l); c.classList.toggle("low", l <= 15); GN.$("#bar").style.width = (l / cfg.time * 100) + "%"; },
+    onEnd:() => { GN.sfx.buzz(); GN.vibe([300, 100, 300]); pensDown(); } });
+  GN.$("#pz").onclick = () => { if (T.paused) { T.resume(); GN.$("#pz").textContent = "Pause"; } else { T.pause(); GN.$("#pz").textContent = "Resume"; } };
+  GN.$("#done").onclick = () => { T.stop(); pensDown(); };
+}
+function pensDown(){
+  GN.stage(`<div class="wrap" style="width:100%"><div style="font-size:70px">✋</div><h1 style="font-size:52px">Pens down!</h1>
+    <p class="lede" style="margin:12px auto">Now go through it one category at a time. Read your answers out loud, then tap each side whose answer scores.</p>
+    <div class="btns"><button class="btn primary big" id="go">Start scoring</button></div></div>`);
+  GN.$("#go").onclick = () => scoreCat(0, G.R.cats.map(() => G.sides.map(() => 0)));
+}
+function scoreCat(ci, pts){
+  const R = G.R, last = ci === R.cats.length - 1;
+  const roundTot = G.sides.map((_, si) => pts.reduce((a, row) => a + row[si], 0));
+  GN.stage(`<div class="wrap" style="width:100%;text-align:left">
+    <div class="row between"><span class="minilet">${R.letter}</span><span class="kicker">Category ${ci + 1} of ${R.cats.length}</span></div>
+    <div class="catname">${GN.esc(R.cats[ci])}</div>
+    <p class="small muted" style="margin:0 0 12px">Tap once for unique (1), twice for alliteration (2), a third time to clear.</p>
+    <div class="sidegrid">${G.sides.map((s, si) => `<button class="sidebtn" data-s="${si}" style="--sc:${s.color}" aria-pressed="${pts[ci][si] > 0}">${GN.esc(s.name)}<small>round: ${roundTot[si]}</small><span class="badge">${pts[ci][si] ? "+" + pts[ci][si] : ""}</span></button>`).join("")}</div>
+    <div class="btns two"><button class="btn" id="prev" ${ci ? "" : "disabled"}>← Back</button><button class="btn primary" id="next">${last ? "Round totals" : "Next →"}</button></div></div>`);
+  GN.$$("[data-s]").forEach(b => b.onclick = () => { const si = +b.dataset.s; pts[ci][si] = (pts[ci][si] + 1) % 3; GN.sfx.tap(); scoreCat(ci, pts); });
+  GN.$("#prev").onclick = () => scoreCat(ci - 1, pts);
+  GN.$("#next").onclick = () => last ? roundEnd(pts) : scoreCat(ci + 1, pts);
+}
+function roundEnd(pts){
+  const delta = G.sides.map((_, si) => pts.reduce((a, row) => a + row[si], 0));
+  delta.forEach((d, i) => G.scores[i] += d); G.round++;
+  const last = G.round >= cfg.rounds;
+  GN.stage(`<div class="wrap" style="width:100%"><div class="kicker">Round ${G.round} · letter ${G.R.letter}</div><h2 style="margin:6px 0 14px">Scores</h2>
+    <div class="card" style="text-align:left">${GN.board(G.sides, G.scores, { delta, sort:true })}</div>
+    <div class="btns"><button class="btn primary big" id="next">${last ? "Final scores 🏆" : "Roll the next letter"}</button></div></div>`);
+  GN.$("#next").onclick = () => last ? GN.finish({ gameId:"categories", gameName:"Categories", sides:G.sides, scores:G.scores, onRematch:start }) : roll();
+}
+const qc = new URLSearchParams(location.search).get("code");
+if (qc && fromCode(qc)) follow(fromCode(qc)); else setup();
+</script>
+</body>
+</html>

@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Imposter · Parlor</title>
+<meta name="theme-color" content="#14111f">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🕵️</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700;9..144,800&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/css/parlor.css">
+<style>
+.grid16{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;text-align:center}
+.grid16 > *{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 4px;font-weight:700;font-size:clamp(12px,3.4vw,15px);line-height:1.15;min-height:52px;display:grid;place-items:center;overflow-wrap:anywhere}
+.grid16 button[aria-pressed="true"]{background:var(--acc);color:var(--acc-ink)}
+.grid16 .hit{background:var(--good);color:#032015}
+.peekbox{min-height:210px;display:flex;align-items:center;justify-content:center;cursor:pointer}
+.peekbox .sec{display:none} .peekbox.on .sec{display:block} .peekbox.on .cover{display:none}
+.imp{background:var(--bad)!important;color:#2a0308!important}
+.cat{font-family:var(--display);font-weight:800;font-size:clamp(28px,8vw,40px);line-height:1.05}
+.order{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-top:10px}
+.order span{padding:4px 10px;border-radius:999px;background:var(--panel2);font-weight:700;font-size:14px}
+.order span.first{background:var(--acc);color:var(--acc-ink)}
+</style>
+</head>
+<body>
+<main class="wrap" id="app"></main>
+<script src="../assets/data/imposter.js"></script>
+<script src="../assets/js/parlor.js"></script>
+<script>
+const app = GN.page({ title:"Imposter", accent:"#f4a3d6", accentInk:"#2e0720" });
+const SETS = (window.GN_DATA && GN_DATA.imposter) || [];
+const cfg = Object.assign({ rounds:6, imps:1, clueRounds:1, grid:true, timer:90 }, GN.get("imposter.cfg", {}));
+const save = () => GN.set("imposter.cfg", cfg);
+let G = null;
+
+function setup(){
+  const n = GN.roster().players.length;
+  GN.render(`<div class="stack">
+    <div><div class="kicker">Social deduction · bluffing</div><h1>Imposter</h1>
+    <p class="lede">Everyone gets the same secret word, except the imposter, who only knows the category. Go around and each say one word about it. Be specific enough to prove you know it, but vague enough that the imposter can't work it out.</p></div>
+    <div id="roster"></div>
+    <div class="card">
+      <h3>Settings</h3>
+      <div class="setting"><div class="lab">Rounds</div>${GN.seg("rounds", [4, 6, 8, 10], cfg.rounds)}</div>
+      <div class="setting"><div class="lab">Imposters<small>Two imposters for 7+ players. They don't know about each other.</small></div>${GN.seg("imps", [1, 2], cfg.imps)}</div>
+      <div class="setting"><div class="lab">Clues per player</div>${GN.seg("clueRounds", [1, 2], cfg.clueRounds, v => v === 1 ? "1 word" : "2 laps")}</div>
+      <div class="setting"><div class="lab">Show the 16-word grid<small>Everyone sees the possible words, and the imposter tries to blend in. Off is harder.</small></div>${GN.seg("grid", [true, false], cfg.grid, v => v ? "Show" : "Hide")}</div>
+      <div class="setting"><div class="lab">Debate timer</div>${GN.seg("timer", [0, 60, 90, 120], cfg.timer, v => v ? v + "s" : "Off")}</div>
+    </div>
+    ${GN.isPairs() ? `<div class="note">Imposter is played individually. Points go to each player's team, so teammates can end up voting against each other.</div>` : ""}
+    <button class="btn primary big block" id="go" ${n < 4 ? "disabled" : ""}>Deal roles</button>
+    ${n < 4 ? `<p class="small" style="color:var(--bad)">Needs at least 4 players.</p>` : ""}
+    <details class="card rules"><summary>Rules & scoring</summary>
+      <ol>
+        <li>Pass the phone. Each person privately sees the secret word, or learns they're the imposter.</li>
+        <li>Starting with the named player and going clockwise, everyone says <b>one word</b> related to the secret.</li>
+        <li>Debate, then on three everyone points at who they suspect. The most-pointed-at player is accused (break ties by re-voting).</li>
+        <li>If the accused is the imposter, they get one guess at the secret word.</li>
+      </ol>
+      <p><b>Imposter escapes</b> (wrong person accused): imposter +2. <b>Caught but guesses the word</b>: imposter +1. <b>Caught and wrong</b>: everyone else +1. ${SETS.length} categories in the pool.</p>
+    </details>
+  </div>`);
+  GN.rosterBlock(GN.$("#roster"), { onChange:setup });
+  GN.bindSegs(app, cfg, () => { save(); setup(); });
+  GN.$("#go").onclick = start;
+}
+function start(){
+  const players = GN.roster().players; if (players.length < 4) return;
+  const sides = GN.sides();
+  G = { players, sides, scores:sides.map(() => 0), round:0, dealer:GN.dealer("imposter", SETS, s => s.cat), pscore:{} };
+  GN._wantWake = true; GN.wake(true);
+  round();
+}
+function award(player, n){ const s = GN.sideOfPlayer(G.sides, player); G.scores[G.sides.indexOf(s)] += n; G.pscore[player] = (G.pscore[player] || 0) + n; }
+function round(){
+  if (G.round >= cfg.rounds) return GN.finish({ gameId:"imposter", gameName:"Imposter", sides:G.sides, scores:G.scores, onRematch:start,
+    note:Object.keys(G.pscore).length ? "Top sleuths: " + Object.entries(G.pscore).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([p, n]) => `${GN.esc(p)} ${n}`).join(", ") : "" });
+  const set = G.dealer.next(); const word = GN.pick(set.words);
+  const nImp = Math.min(cfg.imps, G.players.length >= 7 ? 2 : 1);
+  const imps = GN.shuffle(G.players).slice(0, nImp);
+  const offset = G.round % G.players.length;
+  const order = [...G.players.slice(offset), ...G.players.slice(0, offset)];
+  let first = GN.pick(order.filter(p => !imps.includes(p)));
+  const R = { set, word, imps, order, first };
+  roles(R, 0);
+}
+function roles(R, k){
+  if (k >= R.order.length) return table(R);
+  const p = R.order[k];
+  GN.handoff({ to:p, color:GN.color(G.players.indexOf(p)), emoji:"🤫", msg:`Round ${G.round + 1}. Check your role in private.`, button:"Show my role", onReady:() => {
+    const imp = R.imps.includes(p);
+    const el = GN.stage(`<div class="wrap" style="width:100%">
+      <div class="kicker">${GN.esc(p)} only</div>
+      <div class="bigcard peek peekbox" id="pk" style="margin:14px 0"><div class="cover"><b>👆</b><div>Press and hold</div></div>
+        <div class="sec">${imp ? `<div class="meta">You are the</div><div class="word">IMPOSTER</div><div style="margin-top:10px;font-weight:800">Category: ${GN.esc(R.set.cat)}</div><div class="small" style="opacity:.8;margin-top:6px">Blend in. Listen closely.</div>`
+          : `<div class="meta">${GN.esc(R.set.cat)}</div><div class="word">${GN.esc(R.word)}</div><div class="small" style="opacity:.8;margin-top:6px">One of you doesn't know this.</div>`}</div></div>
+      <div class="btns"><button class="btn primary big" id="ok" disabled>Got it, pass it on</button></div></div>`);
+    GN.peek(GN.$("#pk", el), () => GN.$("#ok").disabled = false);
+    if (imp) GN.$("#pk", el).addEventListener("pointerdown", () => GN.$("#pk", el).classList.add("imp"));
+    GN.$("#ok").onclick = () => roles(R, k + 1);
+  } });
+}
+function table(R){
+  const fi = R.order.indexOf(R.first); const seq = [...R.order.slice(fi), ...R.order.slice(0, fi)];
+  let T = null;
+  GN.stage(`<div class="wrap" style="width:100%">
+    <div class="kicker">Round ${G.round + 1} of ${cfg.rounds}</div>
+    <div class="cat" style="margin:8px 0 12px">${GN.esc(R.set.cat)}</div>
+    ${cfg.grid ? `<div class="grid16">${R.set.words.map(w => `<div>${GN.esc(w)}</div>`).join("")}</div>` : ""}
+    <p style="margin-top:14px"><b>${GN.esc(R.first)}</b> starts. Each say ${cfg.clueRounds === 1 ? "<b>one word</b>" : "one word, <b>twice around</b>"}:</p>
+    <div class="order">${seq.map((p, i) => `<span class="${i ? "" : "first"}">${i + 1}. ${GN.esc(p)}</span>`).join("")}</div>
+    ${cfg.timer ? `<div class="clock" id="clk" style="font-size:44px;margin-top:14px">${GN.fmtTime(cfg.timer)}</div><button class="btn sm" id="t">Start debate timer</button>` : ""}
+    <div class="btns"><button class="btn primary big" id="vote">Point on three… vote!</button></div></div>`);
+  if (cfg.timer) GN.$("#t").onclick = () => { if (T) return; GN.$("#t").disabled = true; T = GN.timer({ seconds:cfg.timer, warn:5, onTick:l => { const c = GN.$("#clk"); if (c) { c.textContent = GN.fmtTime(l); c.classList.toggle("low", l <= 10); } }, onEnd:() => GN.sfx.buzz() }); };
+  GN.$("#vote").onclick = () => { if (T) T.stop(); accuse(R); };
+}
+function accuse(R){
+  let pick = null;
+  const draw = () => {
+    GN.stage(`<div class="wrap" style="width:100%">
+      <div class="kicker">Who got the most fingers?</div><h2 style="margin:6px 0 14px">Accuse someone</h2>
+      <div class="sidegrid">${G.players.map((p, i) => `<button class="sidebtn" data-p="${GN.esc(p)}" style="--sc:${GN.color(i)}" aria-pressed="${pick === p}">${GN.esc(p)}</button>`).join("")}</div>
+      <div class="btns"><button class="btn primary big" id="ok" ${pick ? "" : "disabled"}>Unmask ${pick ? GN.esc(pick) : ""}</button></div></div>`);
+    GN.$$("[data-p]").forEach(b => b.onclick = () => { pick = b.dataset.p; GN.sfx.tap(); draw(); });
+    GN.$("#ok").onclick = () => unmask(R, pick);
+  };
+  draw();
+}
+function unmask(R, acc){
+  const caught = R.imps.includes(acc);
+  if (!caught) {
+    R.imps.forEach(p => award(p, 2)); GN.sfx.bad();
+    return result(R, `${GN.esc(acc)} was innocent! ${R.imps.map(GN.esc).join(" & ")} ${R.imps.length > 1 ? "were" : "was"} the imposter${R.imps.length > 1 ? "s" : ""} and escape${R.imps.length > 1 ? "" : "s"} with +2.`, null);
+  }
+  GN.sfx.ding();
+  GN.stage(`<div class="wrap" style="width:100%">
+    <div style="font-size:60px">🕵️</div><div class="kicker">Caught!</div><h2 style="margin:6px 0">${GN.esc(acc)} is ${R.imps.length > 1 ? "an" : "the"} imposter</h2>
+    <p class="muted">${GN.esc(acc)}, one last chance. What's the secret word?</p>
+    ${cfg.grid ? `<div class="grid16" id="g">${R.set.words.map((w, i) => `<button data-i="${i}">${GN.esc(w)}</button>`).join("")}</div>`
+      : `<input class="input" id="gi" placeholder="Your guess" autocomplete="off"><div class="btns"><button class="btn primary" id="go">Guess</button></div>`}</div>`);
+  const judge = g => { const ok = GN.norm(g) === GN.norm(R.word);
+    if (ok) { award(acc, 1); GN.sfx.good(); } else { G.players.filter(p => !R.imps.includes(p)).forEach(p => award(p, 1)); GN.sfx.win(); }
+    result(R, ok ? `${GN.esc(acc)} guessed it! The imposter claws back +1.` : `${GN.esc(acc)} guessed “${GN.esc(g)}”. Wrong! Everyone else +1.`, g); };
+  if (cfg.grid) GN.$$("#g button").forEach(b => b.onclick = () => judge(R.set.words[+b.dataset.i]));
+  else { GN.$("#go").onclick = () => { const v = GN.$("#gi").value.trim(); if (!v) return; const close = confirm(`The word was "${R.word}". Count "${v}" as correct?`); judge(close ? R.word : v); }; }
+}
+function result(R, line, guess){
+  G.round++;
+  GN.stage(`<div class="wrap" style="width:100%">
+    <div class="kicker">The word was</div>
+    <div class="bigcard" style="margin:12px 0"><div class="meta">${GN.esc(R.set.cat)}</div><div class="word">${GN.esc(R.word)}</div></div>
+    <p>${line}</p>
+    <div class="card" style="text-align:left">${GN.board(G.sides, G.scores, { sort:true })}</div>
+    <div class="btns"><button class="btn primary big" id="next">${G.round >= cfg.rounds ? "Final scores 🏆" : "Next round"}</button></div></div>`);
+  GN.$("#next").onclick = round;
+}
+setup();
+</script>
+</body>
+</html>

@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Spectrum · Parlor</title>
+<meta name="theme-color" content="#14111f">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎯</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700;9..144,800&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/css/parlor.css">
+<style>
+.dialwrap{width:100%;max-width:520px;margin:0 auto;touch-action:none;user-select:none;-webkit-user-select:none}
+.dialwrap svg{width:100%;height:auto;display:block;overflow:visible}
+.ends{display:flex;justify-content:space-between;gap:12px;max-width:520px;margin:6px auto 0;font-weight:800;font-size:clamp(15px,4.4vw,19px);line-height:1.15}
+.ends span{max-width:48%}
+.ends span:first-child{text-align:left;color:var(--s1)} .ends span:last-child{text-align:right;color:var(--s0)}
+.specpick{display:grid;gap:10px}
+.spec{border-radius:16px;border:2px solid var(--line);background:var(--panel2);padding:14px 16px;display:flex;justify-content:space-between;gap:10px;font-weight:800;text-align:left}
+.spec[aria-pressed="true"]{border-color:var(--acc)}
+.spec span:first-child{color:var(--s1)} .spec span:last-child{color:var(--s0);text-align:right}
+.clue{font-family:var(--display);font-weight:800;font-size:clamp(26px,8vw,40px);line-height:1.1;margin:6px 0}
+.lr{display:flex;gap:6px}
+.lr button{flex:1;border-radius:10px;padding:8px;font-weight:800;border:1.5px solid var(--line)}
+.lr button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+.predrow{display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--line)}
+.predrow:first-child{border-top:0}
+</style>
+</head>
+<body>
+<main class="wrap" id="app"></main>
+<script src="../assets/data/spectrum.js"></script>
+<script src="../assets/js/parlor.js"></script>
+<script>
+const app = GN.page({ title:"Spectrum", accent:"#c39bff", accentInk:"#1d0b3a" });
+const SPECS = (window.GN_DATA && GN_DATA.spectrums) || [];
+const cfg = Object.assign({ rounds:1, typeClue:true, predict:true }, GN.get("spectrum.cfg", {}));
+const save = () => GN.set("spectrum.cfg", cfg);
+const BANDS = [[3, 4], [8, 3], [13, 2]]; // within ±d → points
+const ptsFor = (g, t) => { const d = Math.abs(g - t); for (const [w, p] of BANDS) if (d <= w) return p; return 0; };
+let G = null;
+
+/* ---------- dial ---------- */
+const CX = 100, CY = 100, RAD = 92;
+const ang = v => Math.PI - v / 100 * Math.PI;
+const pt = (v, r = RAD) => [CX + r * Math.cos(ang(v)), CY - r * Math.sin(ang(v))];
+function wedge(a, b, color, op = 1){ a = GN.clamp(a, 0, 100); b = GN.clamp(b, 0, 100); if (b <= a) return "";
+  const [x1, y1] = pt(a), [x2, y2] = pt(b); return `<path d="M${CX},${CY} L${x1.toFixed(2)},${y1.toFixed(2)} A${RAD},${RAD} 0 0 1 ${x2.toFixed(2)},${y2.toFixed(2)} Z" fill="${color}" opacity="${op}"/>`; }
+function dialSVG({ target = null, needles = [], hideTarget = false }){
+  let bands = "";
+  if (target != null && !hideTarget) {
+    bands += wedge(target - 13, target + 13, "var(--s2)") + wedge(target - 8, target + 8, "var(--s5)") + wedge(target - 3, target + 3, "var(--s0)");
+    [[-10.5, 2], [-5.5, 3], [0, 4], [5.5, 3], [10.5, 2]].forEach(([o, p]) => { const [x, y] = pt(target + o, RAD - 10); if (target + o > 1 && target + o < 99) bands += `<text x="${x}" y="${y}" text-anchor="middle" dominant-baseline="middle" font-size="8" font-weight="800" fill="#14111f">${p}</text>`; });
+  }
+  const ticks = Array.from({ length:11 }, (_, i) => { const [x1, y1] = pt(i * 10, RAD + 2), [x2, y2] = pt(i * 10, RAD + (i % 5 ? 5 : 8)); return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="var(--faint)" stroke-width="1"/>`; }).join("");
+  const nd = needles.map(n => { const [x, y] = pt(n.v, RAD - 4); return `<line x1="${CX}" y1="${CY}" x2="${x}" y2="${y}" stroke="${n.color}" stroke-width="${n.main ? 4 : 3}" stroke-linecap="round"/>
+    <circle cx="${x}" cy="${y}" r="${n.main ? 6 : 4.5}" fill="${n.color}" stroke="#14111f" stroke-width="1.5"/>${n.label ? `<text x="${pt(n.v, RAD + 15)[0]}" y="${pt(n.v, RAD + 15)[1]}" text-anchor="middle" font-size="7.5" font-weight="800" fill="${n.color}">${GN.esc(n.label)}</text>` : ""}`; }).join("");
+  return `<svg viewBox="-6 -14 212 122" role="img" aria-label="Spectrum dial">
+    <path d="M${CX - RAD},${CY} A${RAD},${RAD} 0 0 1 ${CX + RAD},${CY} Z" fill="var(--panel2)" stroke="var(--line)" stroke-width="1.5"/>
+    ${bands}${ticks}${nd}<circle cx="${CX}" cy="${CY}" r="7" fill="var(--ink)"/></svg>`;
+}
+function bindDrag(wrap, get, set){
+  const svg = () => wrap.querySelector("svg");
+  const at = e => { const r = svg().getBoundingClientRect(); const sx = 212 / r.width; const x = (e.clientX - r.left) * sx - 6 - CX, y = CY - ((e.clientY - r.top) * sx - 14);
+    let a = Math.atan2(Math.max(y, 0.0001), x); return GN.clamp(100 - a / Math.PI * 100, 0, 100); };
+  let down = false;
+  wrap.addEventListener("pointerdown", e => { down = true; wrap.setPointerCapture(e.pointerId); set(at(e)); });
+  wrap.addEventListener("pointermove", e => { if (down) set(at(e)); });
+  wrap.addEventListener("pointerup", () => down = false); wrap.addEventListener("pointercancel", () => down = false);
+}
+
+function setup(){
+  GN.render(`<div class="stack">
+    <div><div class="kicker">Read your partner's mind</div><h1>Spectrum</h1>
+    <p class="lede">The clue-giver secretly sees a target somewhere between two extremes, like <i>Overrated</i> and <i>Underrated</i>. They say one thing that sits right there. Can their partner find the spot?</p></div>
+    <div id="roster"></div>
+    <div class="card">
+      <h3>Settings</h3>
+      <div class="setting"><div class="lab">Turns as clue-giver<small>How many times each player gives a clue.</small></div>${GN.seg("rounds", [1, 2, 3], cfg.rounds)}</div>
+      <div class="setting"><div class="lab">Type the clue on screen<small>Shows the clue so nobody forgets it while the debate gets heated.</small></div>${GN.seg("typeClue", [true, false], cfg.typeClue, v => v ? "Yes" : "Say it")}</div>
+      ${GN.isPairs() ? `<div class="setting"><div class="lab">Left or right?<small>The other teams bet on which side of the dial the target really is, for +1.</small></div>${GN.seg("predict", [true, false], cfg.predict, v => v ? "On" : "Off")}</div>` : ""}
+    </div>
+    <div class="card"><h3>Scoring</h3><div class="dialwrap" style="max-width:320px">${dialSVG({ target:50 })}</div>
+      <p class="small muted center" style="margin:6px 0 0">Bullseye 4 · close 3 · near 2. ${GN.isPairs() ? "Teams of 2: the clue-giver's team scores what the dial lands on." : "Individuals: every guesser sets their own dial privately. Each scores their zone, and the clue-giver gets the average."}</p></div>
+    <button class="btn primary big block" id="go">Start</button>
+    <details class="card rules"><summary>Clue-giving tips</summary>
+      <ul>
+        <li>The clue can be anything: a word, a person, a movie, a food. The only rule is that it's a single idea, so no "kind of hot but also…".</li>
+        <li>Example: <b>Cold ↔ Hot</b> with the target near the hot end: "Jalapeño". Just past the middle: "Bath water".</li>
+        <li>Guessers, argue it out loud. That's half the fun. The clue-giver has to keep a straight face.</li>
+        <li>${SPECS.length} spectrums in the pool. Each clue-giver picks one of two.</li>
+      </ul>
+    </details>
+  </div>`);
+  GN.rosterBlock(GN.$("#roster"), { onChange:setup });
+  GN.bindSegs(app, cfg, () => { save(); setup(); });
+  GN.$("#go").onclick = start;
+}
+
+function start(){
+  const sides = GN.sides(); if (sides.length < 2) return GN.toast("Need at least 2 sides");
+  const players = GN.roster().players;
+  G = { sides, pairs:GN.isPairs(), players, scores:sides.map(() => 0), rot:GN.rotation(sides), dealer:GN.dealer("spectrum", SPECS, s => s.join("|")), done:0 };
+  G.total = (G.pairs ? sides.length * 2 : sides.length) * cfg.rounds; // in pairs, each partner gives clues
+  GN._wantWake = true; GN.wake(true);
+  turn();
+}
+function turn(){
+  if (G.done >= G.total) return GN.finish({ gameId:"spectrum", gameName:"Spectrum", sides:G.sides, scores:G.scores, onRematch:start });
+  const si = G.rot.side(), s = G.sides[si], giver = G.rot.member(si);
+  GN.handoff({ to:giver, color:s.color, emoji:"🤫", msg:`You're giving the clue. Only you should see the next screen.<br><span class="small">Turn ${G.done + 1} of ${G.total}</span>`, button:"Show me the target", onReady:() => secret(si, giver) });
+}
+function secret(si, giver){
+  const opts = [G.dealer.next(), G.dealer.next()]; let pick = 0; const target = 4 + Math.random() * 92;
+  const draw = () => {
+    const sp = opts[pick];
+    GN.stage(`<div class="wrap" style="width:100%">
+      <div class="kicker">Secret · pick a spectrum</div>
+      <div class="specpick" style="margin:12px 0">${opts.map((o, i) => `<button class="spec" data-i="${i}" aria-pressed="${i === pick}"><span>← ${GN.esc(o[0])}</span><span>${GN.esc(o[1])} →</span></button>`).join("")}</div>
+      <div class="dialwrap">${dialSVG({ target })}</div>
+      <div class="ends"><span>${GN.esc(sp[0])}</span><span>${GN.esc(sp[1])}</span></div>
+      ${cfg.typeClue ? `<input class="input" id="clue" maxlength="60" placeholder="Your clue (one idea)" autocomplete="off" style="margin-top:16px">` : `<p class="muted">Think of your clue. You'll say it out loud.</p>`}
+      <div class="btns"><button class="btn primary big" id="ok">Hide target & show the group</button></div></div>`);
+    GN.$$(".spec").forEach(b => b.onclick = () => { const v = GN.$("#clue") ? GN.$("#clue").value : ""; pick = +b.dataset.i; draw(); if (GN.$("#clue")) GN.$("#clue").value = v; });
+    GN.$("#ok").onclick = () => { const clue = GN.$("#clue") ? GN.$("#clue").value.trim() : ""; if (cfg.typeClue && !clue) return GN.toast("Type a clue first"); guessPhase({ si, giver, spec:opts[pick], target, clue }); };
+  };
+  draw();
+}
+function guessPhase(T){
+  const s = G.sides[T.si];
+  if (G.pairs) {
+    const partner = s.members.filter(m => m !== T.giver).join(" & ");
+    T.guesses = [{ who:partner, v:50 }];
+    dialScreen(T, 0, `${GN.esc(partner)}, turn the dial`, () => cfg.predict && G.sides.length > 1 ? predict(T) : reveal(T));
+  } else {
+    T.guessers = G.players.filter(p => p !== T.giver); T.guesses = [];
+    const nextG = k => {
+      if (k >= T.guessers.length) return reveal(T);
+      const p = T.guessers[k];
+      GN.handoff({ to:p, color:GN.color(G.players.indexOf(p)), emoji:"🎯", msg:"Set your dial in secret, then pass it on.", button:"My guess", onReady:() => { T.guesses[k] = { who:p, v:50 }; dialScreen(T, k, `${GN.esc(p)}, your guess`, () => nextG(k + 1), true); } });
+    };
+    // first, show the clue to the whole room
+    GN.stage(`<div class="wrap" style="width:100%"><div class="kicker">${GN.esc(T.giver)}'s clue</div>
+      <div class="ends" style="margin:16px auto"><span>← ${GN.esc(T.spec[0])}</span><span>${GN.esc(T.spec[1])} →</span></div>
+      ${T.clue ? `<div class="clue">“${GN.esc(T.clue)}”</div>` : `<p class="muted">${GN.esc(T.giver)}, say your clue out loud.</p>`}
+      <p class="muted">Everyone will set a dial privately. No discussing!</p>
+      <div class="btns"><button class="btn primary big" id="ok">Pass for guesses</button></div></div>`);
+    GN.$("#ok").onclick = () => nextG(0);
+  }
+}
+function dialScreen(T, k, title, done, priv = false){
+  const g = T.guesses[k];
+  const el = GN.stage(`<div class="wrap" style="width:100%">
+    <div class="kicker">${title}</div>
+    ${T.clue ? `<div class="clue">“${GN.esc(T.clue)}”</div>` : `<p class="muted">Clue from ${GN.esc(T.giver)}: (say it again!)</p>`}
+    <div class="dialwrap" id="dw" style="margin-top:10px">${dialSVG({ needles:[{ v:g.v, color:"var(--acc)", main:true }] })}</div>
+    <div class="ends"><span>${GN.esc(T.spec[0])}</span><span>${GN.esc(T.spec[1])}</span></div>
+    <p class="small muted">Drag anywhere on the dial.${priv ? " Keep it hidden." : " Debate out loud!"}</p>
+    <div class="btns"><button class="btn primary big" id="lock">Lock it in</button></div></div>`);
+  const dw = GN.$("#dw", el);
+  bindDrag(dw, () => g.v, v => { g.v = v; dw.innerHTML = dialSVG({ needles:[{ v, color:"var(--acc)", main:true }] }); });
+  GN.$("#lock").onclick = () => { GN.sfx.tap(); done(); };
+}
+function predict(T){
+  const others = G.sides.map((s, i) => i).filter(i => i !== T.si); T.pred = {};
+  const draw = () => {
+    GN.stage(`<div class="wrap" style="width:100%;text-align:left">
+      <div class="kicker center">Everyone else: left or right?</div>
+      <p class="center muted">Is the real target to the <b>left</b> or <b>right</b> of ${GN.esc(G.sides[T.si].name)}'s dial? +1 if you're right. No point if they hit the bullseye.</p>
+      <div class="dialwrap">${dialSVG({ needles:[{ v:T.guesses[0].v, color:"var(--acc)", main:true }] })}</div>
+      <div class="ends"><span>${GN.esc(T.spec[0])}</span><span>${GN.esc(T.spec[1])}</span></div>
+      <div class="card" style="margin-top:14px">${others.map(i => `<div class="predrow"><span class="grow">${GN.sidePill(G.sides[i])}</span><div class="lr" style="width:150px"><button data-i="${i}" data-v="L" aria-pressed="${T.pred[i] === "L"}">← Left</button><button data-i="${i}" data-v="R" aria-pressed="${T.pred[i] === "R"}">Right →</button></div></div>`).join("")}</div>
+      <div class="btns"><button class="btn primary big" id="ok">Reveal the target</button></div></div>`);
+    GN.$$(".lr button").forEach(b => b.onclick = () => { T.pred[b.dataset.i] = T.pred[b.dataset.i] === b.dataset.v ? undefined : b.dataset.v; draw(); });
+    GN.$("#ok").onclick = () => reveal(T);
+  };
+  draw();
+}
+function reveal(T){
+  const delta = G.sides.map(() => 0); let lines = [];
+  if (G.pairs) {
+    const p = ptsFor(T.guesses[0].v, T.target); delta[T.si] += p;
+    lines.push(`${GN.esc(G.sides[T.si].name)} ${p ? `scores <b>${p}</b>` : "misses"}.`);
+    if (T.pred && p < 4) Object.entries(T.pred).forEach(([i, v]) => { if (!v) return; const right = T.target > T.guesses[0].v; if ((v === "R") === right) { delta[i] += 1; lines.push(`${GN.esc(G.sides[i].name)} called it (+1).`); } });
+  } else {
+    let tot = 0;
+    T.guesses.forEach(g => { const p = ptsFor(g.v, T.target); g.p = p; tot += p; const s = GN.sideOfPlayer(G.sides, g.who); delta[G.sides.indexOf(s)] += p; });
+    const avg = Math.round(tot / T.guesses.length); delta[T.si] += avg;
+    lines.push(`${GN.esc(T.giver)} earns the average: <b>${avg}</b>.`);
+  }
+  delta.forEach((d, i) => G.scores[i] += d);
+  const needles = T.guesses.map((g, k) => ({ v:g.v, color:G.pairs ? "var(--acc)" : GN.color(G.players.indexOf(g.who)), main:G.pairs, label:G.pairs ? "" : g.who.slice(0, 8) }));
+  const el = GN.stage(`<div class="wrap" style="width:100%">
+    <div class="kicker">The target was…</div>
+    ${T.clue ? `<div class="clue" style="font-size:28px">“${GN.esc(T.clue)}”</div>` : ""}
+    <div class="dialwrap" id="dw">${dialSVG({ target:T.target, needles, hideTarget:true })}</div>
+    <div class="ends"><span>${GN.esc(T.spec[0])}</span><span>${GN.esc(T.spec[1])}</span></div>
+    <div id="after" style="opacity:0;transition:.4s">
+      ${!G.pairs ? `<div class="pillrow" style="justify-content:center;margin-top:10px">${T.guesses.map(g => `<span class="pill" style="color:var(--ink)">${GN.esc(g.who)}: ${g.p}</span>`).join("")}</div>` : ""}
+      <p>${lines.join(" ")}</p>
+      <div class="card" style="text-align:left">${GN.board(G.sides, G.scores, { delta })}</div>
+      <div class="btns"><button class="btn primary big" id="next">${G.done + 1 >= G.total ? "Final scores 🏆" : "Next clue-giver"}</button></div></div></div>`);
+  setTimeout(() => { GN.$("#dw", el).innerHTML = dialSVG({ target:T.target, needles }); GN.sfx.ding(); const best = Math.max(...T.guesses.map(g => ptsFor(g.v, T.target))); if (best === 4) { GN.sfx.win(); GN.confetti(); } GN.$("#after").style.opacity = 1; }, 900);
+  GN.$("#next").onclick = () => { G.done++; G.rot.advance(); turn(); };
+}
+setup();
+</script>
+</body>
+</html>

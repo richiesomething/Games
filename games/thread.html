@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Common Thread · Parlor</title>
+<meta name="theme-color" content="#14111f">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧵</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700;9..144,800&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/css/parlor.css">
+<style>
+.clues{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:14px 0}
+.cl{border-radius:18px;min-height:96px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:12px;text-align:center;
+  background:var(--panel2);border:2px dashed var(--line);color:var(--faint);font-weight:800;position:relative}
+.cl.on{background:var(--acc);color:var(--acc-ink);border:0;box-shadow:0 6px 0 rgba(0,0,0,.25)}
+.cl.fresh{animation:pop .35s cubic-bezier(.3,1.6,.5,1)}
+.cl .t{font-family:var(--display);font-size:clamp(20px,5.8vw,28px);line-height:1.1}
+.cl .v{position:absolute;top:6px;left:10px;font-size:12px;opacity:.7}
+.worth{font-family:var(--display);font-weight:800;font-size:26px;color:var(--acc)}
+.answer{font-family:var(--display);font-weight:800;font-size:clamp(28px,8vw,40px);line-height:1.1}
+.judge{display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--line)}
+.judge:first-child{border-top:0}
+.judge .lr{display:flex;gap:6px}
+.judge .lr button{border-radius:10px;padding:8px 14px;font-weight:800;border:1.5px solid var(--line)}
+.judge .lr button[aria-pressed="true"].y{background:var(--good);color:#032015;border-color:transparent}
+.judge .lr button[aria-pressed="true"].n{background:var(--bad);color:#2a0308;border-color:transparent}
+</style>
+</head>
+<body>
+<main class="wrap" id="app"></main>
+<script src="../assets/data/threads.js"></script>
+<script src="../assets/js/parlor.js"></script>
+<script>
+const app = GN.page({ title:"Common Thread", accent:"#ff9f5a", accentInk:"#2b1200" });
+const THREADS = (window.GN_DATA && GN_DATA.threads) || [];
+const WORTH = [5, 3, 2, 1];
+const cfg = Object.assign({ count:10, penalty:true }, GN.get("thread.cfg", {}));
+const save = () => GN.set("thread.cfg", cfg);
+let G = null;
+
+function setup(){
+  GN.render(`<div class="stack">
+    <div><div class="kicker">Lateral thinking · push your luck</div><h1>Common<br>Thread</h1>
+    <p class="lede">Four clues, revealed one at a time. What connects them? Lock in a guess early for big points, or wait for another clue and play it safe.</p></div>
+    <div class="card"><div class="small muted" style="margin-bottom:8px">Example: what links these?</div>
+      <div class="clues" style="margin:0"><div class="cl on"><span class="v">5</span><span class="t">Florida</span></div><div class="cl on"><span class="v">3</span><span class="t">Map</span></div><div class="cl on"><span class="v">2</span><span class="t">Piano</span></div><div class="cl on"><span class="v">1</span><span class="t">Lock</span></div></div>
+      <p class="small muted" style="margin:10px 0 0">They all have <b style="color:var(--ink)">keys</b>.</p></div>
+    <div id="roster"></div>
+    <div class="card">
+      <h3>Settings</h3>
+      <div class="setting"><div class="lab">Puzzles</div>${GN.seg("count", [6, 10, 15, 20], cfg.count)}</div>
+      <div class="setting"><div class="lab">Wrong guesses cost 1<small>Raises the stakes on locking in early.</small></div>${GN.seg("penalty", [true, false], cfg.penalty, v => v ? "On" : "Off")}</div>
+    </div>
+    <div class="note">✍️ Every ${GN.isPairs() ? "team" : "player"} needs a scrap of paper or a notes app to write their guess on when they lock in. ${GN.isPairs() ? "Partners can whisper." : ""}</div>
+    <button class="btn primary big block" id="go">Start</button>
+    <details class="card rules"><summary>Rules</summary>
+      <ol>
+        <li>Put the phone where everyone can see it. Whoever's nearest taps <b>Next clue</b>.</li>
+        <li>When you think you know, <b>write your answer down</b> and tap your name to lock in. Locking in after clue 1 is worth 5, after clue 2 is worth 3, then 2, then 1.</li>
+        <li>You get one lock per puzzle, and you can't change your answer.</li>
+        <li>After clue 4, or once everyone has locked in, reveal the answer. Read your guesses out and the room judges each one. Close enough counts.</li>
+        <li>${THREADS.length} puzzles. Clues go from sneaky to obvious.</li>
+      </ol>
+    </details>
+  </div>`);
+  GN.rosterBlock(GN.$("#roster"));
+  GN.bindSegs(app, cfg, () => { save(); setup(); });
+  GN.$("#go").onclick = start;
+}
+function start(){
+  const sides = GN.sides(); if (sides.length < 2) return GN.toast("Need at least 2 sides");
+  G = { sides, scores:sides.map(() => 0), n:0, puzzles:GN.deal("thread", THREADS, cfg.count, t => t.a) };
+  GN._wantWake = true; GN.wake(true);
+  puzzle();
+}
+function puzzle(){
+  if (G.n >= G.puzzles.length) return GN.finish({ gameId:"thread", gameName:"Common Thread", sides:G.sides, scores:G.scores, onRematch:start });
+  const P = G.puzzles[G.n], S = { shown:1, locks:{}, fresh:0 };
+  const draw = () => {
+    const all = Object.keys(S.locks).length === G.sides.length;
+    GN.stage(`<div class="wrap" style="width:100%">
+      <div class="row between"><span class="kicker">Puzzle ${G.n + 1} of ${G.puzzles.length}</span><button class="iconbtn" data-sound>${GN.soundOn() ? "🔊" : "🔇"}</button></div>
+      <div class="clues">${P.c.map((c, i) => `<div class="cl${i < S.shown ? " on" : ""}${i === S.fresh ? " fresh" : ""}"><span class="v">${WORTH[i]}</span>${i < S.shown ? `<span class="t">${GN.esc(c)}</span>` : `<span>Clue ${i + 1}</span>`}</div>`).join("")}</div>
+      <div class="muted small">Lock in now for</div><div class="worth">${WORTH[S.shown - 1]} points</div>
+      <div class="sidegrid" style="margin-top:12px">${G.sides.map((s, i) => `<button class="sidebtn" data-i="${i}" style="--sc:${s.color}" aria-pressed="${S.locks[i] != null}" ${S.locks[i] != null ? "disabled" : ""}>${GN.esc(s.name)}<small>${S.locks[i] != null ? "🔒 locked for " + WORTH[S.locks[i] - 1] : "tap to lock in"}</small></button>`).join("")}</div>
+      <div class="btns two"><button class="btn" id="next" ${S.shown >= 4 ? "disabled" : ""}>Next clue →</button><button class="btn primary" id="rev" ${S.shown >= 4 || all ? "" : ""}>Reveal answer</button></div></div>`);
+    GN.$$("[data-i]").forEach(b => b.onclick = () => { const i = +b.dataset.i; if (S.locks[i] != null) return; S.locks[i] = S.shown; S.fresh = -1; GN.sfx.ding(); GN.vibe(30); draw(); });
+    GN.$("#next").onclick = () => { if (S.shown < 4) { S.shown++; S.fresh = S.shown - 1; GN.sfx.tap(); draw(); } };
+    GN.$("#rev").onclick = () => { if (S.shown < 4 && Object.keys(S.locks).length < G.sides.length && !confirm("Not everyone has locked in yet. Reveal anyway?")) return; judge(P, S); };
+  };
+  draw();
+}
+function judge(P, S){
+  const verdict = {};
+  const draw = () => {
+    const locked = Object.keys(S.locks).map(Number);
+    GN.stage(`<div class="wrap" style="width:100%">
+      <div class="kicker">The connection</div>
+      <div class="answer" style="margin:8px 0">${GN.esc(P.a)}</div>
+      <div class="clues" style="margin:8px 0">${P.c.map(c => `<div class="cl on" style="min-height:64px"><span class="t" style="font-size:19px">${GN.esc(c)}</span></div>`).join("")}</div>
+      <p class="muted">${GN.esc(P.x || "")}</p>
+      ${locked.length ? `<div class="card" style="text-align:left"><div class="small muted" style="margin-bottom:6px">Read your guesses out. Were they right?</div>
+        ${locked.map(i => `<div class="judge"><span class="grow">${GN.sidePill(G.sides[i])} <span class="tiny muted">for ${WORTH[S.locks[i] - 1]}</span></span>
+          <div class="lr"><button class="y" data-i="${i}" data-v="1" aria-pressed="${verdict[i] === 1}">✓</button><button class="n" data-i="${i}" data-v="0" aria-pressed="${verdict[i] === 0}">✗</button></div></div>`).join("")}</div>`
+        : `<p>Nobody locked in. On to the next one.</p>`}
+      <div class="btns"><button class="btn primary big" id="ok" ${locked.every(i => verdict[i] != null) ? "" : "disabled"}>Score it</button></div></div>`);
+    GN.$$(".lr button").forEach(b => b.onclick = () => { verdict[b.dataset.i] = +b.dataset.v; GN.sfx.tap(); draw(); });
+    GN.$("#ok").onclick = () => {
+      const delta = G.sides.map(() => 0);
+      locked.forEach(i => { delta[i] = verdict[i] ? WORTH[S.locks[i] - 1] : (cfg.penalty ? -1 : 0); });
+      delta.forEach((d, i) => G.scores[i] += d);
+      if (delta.some(d => d >= 5)) GN.sfx.win(); else if (delta.some(d => d > 0)) GN.sfx.good();
+      G.n++;
+      GN.stage(`<div class="wrap" style="width:100%"><div class="kicker">After puzzle ${G.n}</div><h2 style="margin:6px 0 14px">${GN.esc(P.a)}</h2>
+        <div class="card" style="text-align:left">${GN.board(G.sides, G.scores, { delta, sort:true })}</div>
+        <div class="btns"><button class="btn primary big" id="nx">${G.n >= G.puzzles.length ? "Final scores 🏆" : "Next puzzle"}</button></div></div>`);
+      GN.$("#nx").onclick = puzzle;
+    };
+  };
+  draw();
+}
+setup();
+</script>
+</body>
+</html>
