@@ -43,31 +43,21 @@ let G = null;
 function setup(){
   GN.render(`<div class="stack">
     <div><div class="kicker">Bluffing · wordplay</div><h1>Fictionary</h1>
-    <p class="lede">A real but wildly obscure word. Everyone writes a fake definition that sounds right. Then find the real one among the fakes, and fool as many friends as you can.</p></div>
-    <div class="card center"><div class="dword" style="font-size:40px">Gongoozler</div><div class="pos">noun</div>
-      <p class="small muted" style="margin:8px 0 0">Is it (a) a Victorian gong-maker, (b) someone who enjoys idly watching boats on canals, or (c) a goose that won't stop honking? (It's b.)</p></div>
+    <p class="lede">Make up a fake meaning for a weird real word. Fool your friends, find the truth.</p></div>
     <div id="roster"></div>
-    <div class="card">
-      <h3>Settings</h3>
-      <div class="setting"><div class="lab">Writing fakes<small id="mh"></small></div>${GN.seg("mode", ["type", "paper"], cfg.mode, v => v === "type" ? "Type on this phone" : "Pen & paper")}</div>
-      <div class="setting"><div class="lab">Turns as reader<small>How many words each side presents.</small></div>${GN.seg("rounds", [1, 2, 3], cfg.rounds)}</div>
-      ${cfg.mode === "paper" ? `<div class="setting"><div class="lab">Writing timer</div>${GN.seg("timer", [0, 90, 120, 180], cfg.timer, v => v ? v / 60 + " min" : "Off")}</div>` : ""}
-    </div>
     <button class="btn primary big block" id="go">Start</button>
-    <details class="card rules"><summary>Rules & scoring</summary>
-      <ol>
-        <li>The <b>reader</b> secretly sees the word and its real definition, then announces the word and spells it out.</li>
-        <li>Everyone else writes a believable fake definition. Match the dictionary style!</li>
-        <li>The reader mixes in the real one and reads every definition aloud, with a straight face.</li>
-        <li>On three, everyone points at (or holds up fingers for) the definition they believe.</li>
-      </ol>
-      <p><b>+2</b> for picking the real definition. <b>+1</b> for each person fooled by your fake. <b>+3</b> to the reader if nobody finds the real one. Wrote something basically correct? <b>+3</b> and it's taken out before reading.</p>
-      <p>${WORDS.length} words in the pool.</p>
-    </details>
+    <div class="card rules"><h3>How to play</h3><ul>
+      <li>The reader gets a strange word and its real meaning.</li>
+      <li>Everyone else writes a fake meaning that sounds real.</li>
+      <li>All the meanings are read out. Vote for the real one.</li>
+      <li>+2 for finding it, +1 for each person you fool.</li></ul></div>
+    <details class="card"><summary>⚙️ Options</summary>
+      <div class="setting"><div class="lab">Write fakes on</div>${GN.seg("mode", ["type", "paper"], cfg.mode, v => v === "type" ? "This phone" : "Paper")}</div>
+      <div class="setting"><div class="lab">Turns as reader</div>${GN.seg("rounds", [1, 2, 3], cfg.rounds)}</div>
+      ${cfg.mode === "paper" ? `<div class="setting"><div class="lab">Writing timer</div>${GN.seg("timer", [0, 90, 120, 180], cfg.timer, v => v ? v / 60 + " min" : "Off")}</div>` : ""}</details>
   </div>`);
-  GN.rosterBlock(GN.$("#roster"), { minSides:3, note:"Best with 4+ sides. The more fakes, the harder it is to spot the real one." });
+  GN.rosterBlock(GN.$("#roster"), { minSides:3 });
   GN.bindSegs(app, cfg, () => { save(); setup(); });
-  GN.$("#mh").textContent = cfg.mode === "type" ? "Pass the phone. Definitions get shuffled and scored automatically." : "Each side writes on paper and the reader collects them. The phone keeps score.";
   GN.$("#go").onclick = start;
 }
 function start(){
@@ -102,39 +92,25 @@ function announce(ri, W){
 /* ---------- typing mode ---------- */
 function writeFake(ri, W, k, fakes){
   const ws = others(ri);
-  if (k >= ws.length) return review(ri, W, fakes);
+  if (k >= ws.length) return readAloud(ri, W, fakes);
   const si = ws[k], s = G.sides[si];
   GN.handoff({ to:s.name, color:s.color, emoji:"✍️", msg:`Write a fake definition for <b>${GN.esc(W.w)}</b> <i>(${GN.esc(W.pos || "")})</i>.`, button:"Write mine", onReady:() => {
     const el = GN.stage(`<div class="wrap" style="width:100%;text-align:left">
       <div class="kicker">${GN.esc(s.name)} · secret</div><div class="dword" style="font-size:40px;margin:8px 0 2px">${GN.esc(W.w)}</div><div class="pos">${GN.esc(W.pos || "")}</div>
       <textarea class="input" id="d" maxlength="160" placeholder="Sound like a dictionary…" style="margin-top:14px"></textarea>
-      <p class="tiny muted">Tip: copy the style. Short, confident, slightly boring.</p>
+      <p class="tiny muted">Short and confident works best.</p>
       <div class="btns"><button class="btn primary big" id="ok" disabled>Submit</button></div></div>`);
     const d = GN.$("#d", el); d.oninput = () => GN.$("#ok").disabled = d.value.trim().length < 3; setTimeout(() => d.focus(), 80);
-    GN.$("#ok").onclick = () => { let t = d.value.trim(); t = t[0].toUpperCase() + t.slice(1); if (!/[.!?]$/.test(t)) t += "."; fakes.push({ si, d:t, right:false }); GN.sfx.good(); writeFake(ri, W, k + 1, fakes); };
-  } });
-}
-function review(ri, W, fakes){
-  GN.handoff({ to:G.sides[ri].name, color:G.sides[ri].color, emoji:"🧐", msg:"Check the fakes in private before you read them aloud.", button:"Review fakes", onReady:() => {
-    const draw = () => {
-      GN.stage(`<div class="wrap" style="width:100%;text-align:left">
-        <div class="kicker">Reader only</div><h2 style="margin:6px 0">Any basically correct?</h2>
-        <p class="small muted">Real: <b style="color:var(--ink)">${GN.esc(W.d)}</b><br>Mark any fake that's essentially right. It's worth +3 and gets taken out.</p>
-        <div class="defs">${fakes.map((f, i) => `<li><div class="grow">${GN.esc(f.d)}<span class="by">${GN.esc(G.sides[f.si].name)}</span></div><button class="mark" data-i="${i}" aria-pressed="${f.right}">${f.right ? "✓ Correct" : "Correct?"}</button></li>`).join("")}</div>
-        <div class="btns"><button class="btn primary big" id="ok">Shuffle & read aloud</button></div></div>`);
-      GN.$$(".mark").forEach(b => b.onclick = () => { const f = fakes[+b.dataset.i]; f.right = !f.right; draw(); });
-      GN.$("#ok").onclick = () => readAloud(ri, W, fakes);
-    };
-    draw();
+    GN.$("#ok").onclick = () => { let t = d.value.trim(); t = t[0].toUpperCase() + t.slice(1); if (!/[.!?]$/.test(t)) t += "."; fakes.push({ si, d:t }); GN.sfx.good(); writeFake(ri, W, k + 1, fakes); };
   } });
 }
 function readAloud(ri, W, fakes){
-  const list = GN.shuffle([{ real:true, d:W.d }, ...fakes.filter(f => !f.right)]);
+  const list = GN.shuffle([{ real:true, d:W.d }, ...fakes]);
   GN.stage(`<div class="wrap" style="width:100%">
     <div class="kicker">${GN.esc(G.sides[ri].name)}, read these out</div>
     <div class="dword" style="font-size:40px;margin:8px 0 2px">${GN.esc(W.w)}</div><div class="pos" style="margin-bottom:14px">${GN.esc(W.pos || "")}</div>
     <ol class="defs">${list.map((x, i) => `<li><b>${i + 1}</b><span>${GN.esc(x.d)}</span></li>`).join("")}</ol>
-    <p class="muted">On three, everyone holds up fingers for the definition they believe. You can't vote for your own.</p>
+    <p class="muted">On three, hold up fingers for the one you think is real.</p>
     <div class="btns"><button class="btn primary big" id="ok">Enter votes</button></div></div>`);
   GN.$("#ok").onclick = () => voting(ri, W, fakes, list);
 }
@@ -150,7 +126,6 @@ function voting(ri, W, fakes, list){
     GN.$$(".votes button").forEach(b => b.onclick = () => { votes[b.dataset.s] = +b.dataset.v; GN.sfx.tap(); draw(); });
     GN.$("#ok").onclick = () => {
       const delta = G.sides.map(() => 0); let found = 0;
-      fakes.filter(f => f.right).forEach(f => delta[f.si] += 3);
       voters.forEach(si => { const pick = list[votes[si]]; if (pick.real) { delta[si] += 2; found++; } else delta[pick.si] += 1; });
       if (!found) delta[ri] += 3;
       settle(ri, W, delta, list, votes, found);
@@ -169,21 +144,20 @@ function paperTimer(ri, W){
   GN.$("#ok").onclick = () => { T.stop(); paperTally(ri, W); };
 }
 function paperTally(ri, W){
-  const st = {}; others(ri).forEach(si => st[si] = { found:false, fooled:0, right:false });
+  const st = {}; others(ri).forEach(si => st[si] = { found:false, fooled:0 });
   const draw = () => {
     GN.stage(`<div class="wrap" style="width:100%;text-align:left">
-      <div class="kicker center">Reader: shuffle the slips with the real one and read them all out. Then vote and tally.</div>
-      <div class="card" style="margin-top:12px">${others(ri).map(si => `<div class="vrow"><div class="row between">${GN.sidePill(G.sides[si])}<button class="mark" data-r="${si}" aria-pressed="${st[si].right}">Basically right +3</button></div>
+      <div class="kicker center">Read all the slips plus the real one, vote, then tally</div>
+      <div class="card" style="margin-top:12px">${others(ri).map(si => `<div class="vrow"><div class="row between">${GN.sidePill(G.sides[si])}</div>
         <div class="row between" style="margin-top:8px"><button class="mark" data-f="${si}" aria-pressed="${st[si].found}">${st[si].found ? "✓ Found the real one" : "Found the real one?"}</button>
         <span class="step"><span class="small muted">fooled</span><button data-m="${si}">−</button><b>${st[si].fooled}</b><button data-p="${si}">+</button></span></div></div>`).join("")}</div>
       <div class="btns"><button class="btn primary big" id="ok">Score it</button></div></div>`);
-    GN.$$("[data-r]").forEach(b => b.onclick = () => { st[b.dataset.r].right = !st[b.dataset.r].right; draw(); });
     GN.$$("[data-f]").forEach(b => b.onclick = () => { st[b.dataset.f].found = !st[b.dataset.f].found; draw(); });
     GN.$$("[data-m]").forEach(b => b.onclick = () => { st[b.dataset.m].fooled = Math.max(0, st[b.dataset.m].fooled - 1); draw(); });
     GN.$$("[data-p]").forEach(b => b.onclick = () => { st[b.dataset.p].fooled++; draw(); });
     GN.$("#ok").onclick = () => {
       const delta = G.sides.map(() => 0); let found = 0;
-      Object.entries(st).forEach(([si, x]) => { delta[si] += (x.found ? 2 : 0) + x.fooled + (x.right ? 3 : 0); if (x.found) found++; });
+      Object.entries(st).forEach(([si, x]) => { delta[si] += (x.found ? 2 : 0) + x.fooled; if (x.found) found++; });
       if (!found) delta[ri] += 3;
       settle(ri, W, delta, null, null, found);
     };

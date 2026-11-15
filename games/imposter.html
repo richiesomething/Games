@@ -30,36 +30,29 @@
 <script>
 const app = GN.page({ title:"Imposter", accent:"#f4a3d6", accentInk:"#2e0720" });
 const SETS = (window.GN_DATA && GN_DATA.imposter) || [];
-const cfg = Object.assign({ rounds:6, imps:1, clueRounds:1, grid:true, timer:90 }, GN.get("imposter.cfg", {}));
+const cfg = Object.assign({ rounds:5, imps:1, clueRounds:1, grid:true, timer:0 }, GN.get("imposter.cfg", {}));
 const save = () => GN.set("imposter.cfg", cfg);
 let G = null;
 
 function setup(){
   const n = GN.roster().players.length;
   GN.render(`<div class="stack">
-    <div><div class="kicker">Social deduction · bluffing</div><h1>Imposter</h1>
-    <p class="lede">Everyone gets the same secret word, except the imposter, who only knows the category. Go around and each say one word about it. Be specific enough to prove you know it, but vague enough that the imposter can't work it out.</p></div>
+    <div><div class="kicker">Who's faking it?</div><h1>Imposter</h1>
+    <p class="lede">Everyone knows the secret word except one person. Find them.</p></div>
     <div id="roster"></div>
-    <div class="card">
-      <h3>Settings</h3>
-      <div class="setting"><div class="lab">Rounds</div>${GN.seg("rounds", [4, 6, 8, 10], cfg.rounds)}</div>
-      <div class="setting"><div class="lab">Imposters<small>Two imposters for 7+ players. They don't know about each other.</small></div>${GN.seg("imps", [1, 2], cfg.imps)}</div>
-      <div class="setting"><div class="lab">Clues per player</div>${GN.seg("clueRounds", [1, 2], cfg.clueRounds, v => v === 1 ? "1 word" : "2 laps")}</div>
-      <div class="setting"><div class="lab">Show the 16-word grid<small>Everyone sees the possible words, and the imposter tries to blend in. Off is harder.</small></div>${GN.seg("grid", [true, false], cfg.grid, v => v ? "Show" : "Hide")}</div>
-      <div class="setting"><div class="lab">Debate timer</div>${GN.seg("timer", [0, 60, 90, 120], cfg.timer, v => v ? v + "s" : "Off")}</div>
-    </div>
-    ${GN.isPairs() ? `<div class="note">Imposter is played individually. Points go to each player's team, so teammates can end up voting against each other.</div>` : ""}
     <button class="btn primary big block" id="go" ${n < 4 ? "disabled" : ""}>Deal roles</button>
     ${n < 4 ? `<p class="small" style="color:var(--bad)">Needs at least 4 players.</p>` : ""}
-    <details class="card rules"><summary>Rules & scoring</summary>
-      <ol>
-        <li>Pass the phone. Each person privately sees the secret word, or learns they're the imposter.</li>
-        <li>Starting with the named player and going clockwise, everyone says <b>one word</b> related to the secret.</li>
-        <li>Debate, then on three everyone points at who they suspect. The most-pointed-at player is accused (break ties by re-voting).</li>
-        <li>If the accused is the imposter, they get one guess at the secret word.</li>
-      </ol>
-      <p><b>Imposter escapes</b> (wrong person accused): imposter +2. <b>Caught but guesses the word</b>: imposter +1. <b>Caught and wrong</b>: everyone else +1. ${SETS.length} categories in the pool.</p>
-    </details>
+    <div class="card rules"><h3>How to play</h3><ul>
+      <li>Pass the phone. Peek at the secret word, or learn you're the imposter.</li>
+      <li>Go around and each say one word about it.</li>
+      <li>Point at who you think is faking.</li>
+      <li>Caught imposters get one guess at the word to escape.</li></ul></div>
+    <details class="card"><summary>⚙️ Options</summary>
+      <div class="setting"><div class="lab">Rounds</div>${GN.seg("rounds", [3, 5, 8], cfg.rounds)}</div>
+      <div class="setting"><div class="lab">Imposters (2 needs 7+ players)</div>${GN.seg("imps", [1, 2], cfg.imps)}</div>
+      <div class="setting"><div class="lab">Clues per player</div>${GN.seg("clueRounds", [1, 2], cfg.clueRounds, v => v === 1 ? "1 word" : "2 laps")}</div>
+      <div class="setting"><div class="lab">Show the word list</div>${GN.seg("grid", [true, false], cfg.grid, v => v ? "Show" : "Hide")}</div>
+      <div class="setting"><div class="lab">Debate timer</div>${GN.seg("timer", [0, 60, 90], cfg.timer, v => v ? v + "s" : "Off")}</div></details>
   </div>`);
   GN.rosterBlock(GN.$("#roster"), { onChange:setup });
   GN.bindSegs(app, cfg, () => { save(); setup(); });
@@ -93,8 +86,8 @@ function roles(R, k){
     const el = GN.stage(`<div class="wrap" style="width:100%">
       <div class="kicker">${GN.esc(p)} only</div>
       <div class="bigcard peek peekbox" id="pk" style="margin:14px 0"><div class="cover"><b>👆</b><div>Press and hold</div></div>
-        <div class="sec">${imp ? `<div class="meta">You are the</div><div class="word">IMPOSTER</div><div style="margin-top:10px;font-weight:800">Category: ${GN.esc(R.set.cat)}</div><div class="small" style="opacity:.8;margin-top:6px">Blend in. Listen closely.</div>`
-          : `<div class="meta">${GN.esc(R.set.cat)}</div><div class="word">${GN.esc(R.word)}</div><div class="small" style="opacity:.8;margin-top:6px">One of you doesn't know this.</div>`}</div></div>
+        <div class="sec">${imp ? `<div class="meta">You are the</div><div class="word">IMPOSTER</div><div style="margin-top:10px;font-weight:800">Category: ${GN.esc(R.set.cat)}</div><div class="small" style="opacity:.8;margin-top:6px">Blend in!</div>`
+          : `<div class="meta">${GN.esc(R.set.cat)}</div><div class="word">${GN.esc(R.word)}</div>`}</div></div>
       <div class="btns"><button class="btn primary big" id="ok" disabled>Got it, pass it on</button></div></div>`);
     GN.peek(GN.$("#pk", el), () => GN.$("#ok").disabled = false);
     if (imp) GN.$("#pk", el).addEventListener("pointerdown", () => GN.$("#pk", el).classList.add("imp"));
@@ -136,7 +129,7 @@ function unmask(R, acc){
   GN.sfx.ding();
   GN.stage(`<div class="wrap" style="width:100%">
     <div style="font-size:60px">🕵️</div><div class="kicker">Caught!</div><h2 style="margin:6px 0">${GN.esc(acc)} is ${R.imps.length > 1 ? "an" : "the"} imposter</h2>
-    <p class="muted">${GN.esc(acc)}, one last chance. What's the secret word?</p>
+    <p class="muted">${GN.esc(acc)}, guess the word to escape.</p>
     ${cfg.grid ? `<div class="grid16" id="g">${R.set.words.map((w, i) => `<button data-i="${i}">${GN.esc(w)}</button>`).join("")}</div>`
       : `<input class="input" id="gi" placeholder="Your guess" autocomplete="off"><div class="btns"><button class="btn primary" id="go">Guess</button></div>`}</div>`);
   const judge = g => { const ok = GN.norm(g) === GN.norm(R.word);

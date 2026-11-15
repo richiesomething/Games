@@ -34,7 +34,7 @@
 <script>
 const app = GN.page({ title:"Spectrum", accent:"#c39bff", accentInk:"#1d0b3a" });
 const SPECS = (window.GN_DATA && GN_DATA.spectrums) || [];
-const cfg = Object.assign({ rounds:1, typeClue:true, predict:true }, GN.get("spectrum.cfg", {}));
+const cfg = Object.assign({ rounds:1, typeClue:false, predict:false }, GN.get("spectrum.cfg", {}));
 const save = () => GN.set("spectrum.cfg", cfg);
 const BANDS = [[3, 4], [8, 3], [13, 2]]; // within ±d → points
 const ptsFor = (g, t) => { const d = Math.abs(g - t); for (const [w, p] of BANDS) if (d <= w) return p; return 0; };
@@ -72,25 +72,18 @@ function bindDrag(wrap, get, set){
 function setup(){
   GN.render(`<div class="stack">
     <div><div class="kicker">Read your partner's mind</div><h1>Spectrum</h1>
-    <p class="lede">The clue-giver secretly sees a target somewhere between two extremes, like <i>Overrated</i> and <i>Underrated</i>. They say one thing that sits right there. Can their partner find the spot?</p></div>
+    <p class="lede">Give one clue. Can your partner find the secret spot on the dial?</p></div>
     <div id="roster"></div>
-    <div class="card">
-      <h3>Settings</h3>
-      <div class="setting"><div class="lab">Turns as clue-giver<small>How many times each player gives a clue.</small></div>${GN.seg("rounds", [1, 2, 3], cfg.rounds)}</div>
-      <div class="setting"><div class="lab">Type the clue on screen<small>Shows the clue so nobody forgets it while the debate gets heated.</small></div>${GN.seg("typeClue", [true, false], cfg.typeClue, v => v ? "Yes" : "Say it")}</div>
-      ${GN.isPairs() ? `<div class="setting"><div class="lab">Left or right?<small>The other teams bet on which side of the dial the target really is, for +1.</small></div>${GN.seg("predict", [true, false], cfg.predict, v => v ? "On" : "Off")}</div>` : ""}
-    </div>
-    <div class="card"><h3>Scoring</h3><div class="dialwrap" style="max-width:320px">${dialSVG({ target:50 })}</div>
-      <p class="small muted center" style="margin:6px 0 0">Bullseye 4 · close 3 · near 2. ${GN.isPairs() ? "Teams of 2: the clue-giver's team scores what the dial lands on." : "Individuals: every guesser sets their own dial privately. Each scores their zone, and the clue-giver gets the average."}</p></div>
     <button class="btn primary big block" id="go">Start</button>
-    <details class="card rules"><summary>Clue-giving tips</summary>
-      <ul>
-        <li>The clue can be anything: a word, a person, a movie, a food. The only rule is that it's a single idea, so no "kind of hot but also…".</li>
-        <li>Example: <b>Cold ↔ Hot</b> with the target near the hot end: "Jalapeño". Just past the middle: "Bath water".</li>
-        <li>Guessers, argue it out loud. That's half the fun. The clue-giver has to keep a straight face.</li>
-        <li>${SPECS.length} spectrums in the pool. Each clue-giver picks one of two.</li>
-      </ul>
-    </details>
+    <div class="card rules"><h3>How to play</h3><ul>
+      <li>The clue-giver secretly sees a target between two opposites, like <b>Cold ↔ Hot</b>.</li>
+      <li>They say one thing that sits right there, like "Bath water".</li>
+      <li>${GN.isPairs() ? "Their partner turns the dial to guess." : "Everyone else turns the dial in secret."}</li>
+      <li>Closer = more points (4 / 3 / 2).</li></ul></div>
+    <details class="card"><summary>⚙️ Options</summary>
+      <div class="setting"><div class="lab">Turns each</div>${GN.seg("rounds", [1, 2, 3], cfg.rounds)}</div>
+      <div class="setting"><div class="lab">Type the clue on screen</div>${GN.seg("typeClue", [false, true], cfg.typeClue, v => v ? "Yes" : "No")}</div>
+      ${GN.isPairs() ? `<div class="setting"><div class="lab">Other teams bet left/right (+1)</div>${GN.seg("predict", [false, true], cfg.predict, v => v ? "On" : "Off")}</div>` : ""}</details>
   </div>`);
   GN.rosterBlock(GN.$("#roster"), { onChange:setup });
   GN.bindSegs(app, cfg, () => { save(); setup(); });
@@ -119,7 +112,7 @@ function secret(si, giver){
       <div class="specpick" style="margin:12px 0">${opts.map((o, i) => `<button class="spec" data-i="${i}" aria-pressed="${i === pick}"><span>← ${GN.esc(o[0])}</span><span>${GN.esc(o[1])} →</span></button>`).join("")}</div>
       <div class="dialwrap">${dialSVG({ target })}</div>
       <div class="ends"><span>${GN.esc(sp[0])}</span><span>${GN.esc(sp[1])}</span></div>
-      ${cfg.typeClue ? `<input class="input" id="clue" maxlength="60" placeholder="Your clue (one idea)" autocomplete="off" style="margin-top:16px">` : `<p class="muted">Think of your clue. You'll say it out loud.</p>`}
+      ${cfg.typeClue ? `<input class="input" id="clue" maxlength="60" placeholder="Your clue (one idea)" autocomplete="off" style="margin-top:16px">` : `<p class="muted">Think of a clue. You'll say it out loud.</p>`}
       <div class="btns"><button class="btn primary big" id="ok">Hide target & show the group</button></div></div>`);
     GN.$$(".spec").forEach(b => b.onclick = () => { const v = GN.$("#clue") ? GN.$("#clue").value : ""; pick = +b.dataset.i; draw(); if (GN.$("#clue")) GN.$("#clue").value = v; });
     GN.$("#ok").onclick = () => { const clue = GN.$("#clue") ? GN.$("#clue").value.trim() : ""; if (cfg.typeClue && !clue) return GN.toast("Type a clue first"); guessPhase({ si, giver, spec:opts[pick], target, clue }); };
@@ -143,7 +136,7 @@ function guessPhase(T){
     GN.stage(`<div class="wrap" style="width:100%"><div class="kicker">${GN.esc(T.giver)}'s clue</div>
       <div class="ends" style="margin:16px auto"><span>← ${GN.esc(T.spec[0])}</span><span>${GN.esc(T.spec[1])} →</span></div>
       ${T.clue ? `<div class="clue">“${GN.esc(T.clue)}”</div>` : `<p class="muted">${GN.esc(T.giver)}, say your clue out loud.</p>`}
-      <p class="muted">Everyone will set a dial privately. No discussing!</p>
+      <p class="muted">Everyone sets a dial in secret.</p>
       <div class="btns"><button class="btn primary big" id="ok">Pass for guesses</button></div></div>`);
     GN.$("#ok").onclick = () => nextG(0);
   }
@@ -155,7 +148,7 @@ function dialScreen(T, k, title, done, priv = false){
     ${T.clue ? `<div class="clue">“${GN.esc(T.clue)}”</div>` : `<p class="muted">Clue from ${GN.esc(T.giver)}: (say it again!)</p>`}
     <div class="dialwrap" id="dw" style="margin-top:10px">${dialSVG({ needles:[{ v:g.v, color:"var(--acc)", main:true }] })}</div>
     <div class="ends"><span>${GN.esc(T.spec[0])}</span><span>${GN.esc(T.spec[1])}</span></div>
-    <p class="small muted">Drag anywhere on the dial.${priv ? " Keep it hidden." : " Debate out loud!"}</p>
+    <p class="small muted">Drag the dial.${priv ? " Keep it secret." : ""}</p>
     <div class="btns"><button class="btn primary big" id="lock">Lock it in</button></div></div>`);
   const dw = GN.$("#dw", el);
   bindDrag(dw, () => g.v, v => { g.v = v; dw.innerHTML = dialSVG({ needles:[{ v, color:"var(--acc)", main:true }] }); });
@@ -166,7 +159,7 @@ function predict(T){
   const draw = () => {
     GN.stage(`<div class="wrap" style="width:100%;text-align:left">
       <div class="kicker center">Everyone else: left or right?</div>
-      <p class="center muted">Is the real target to the <b>left</b> or <b>right</b> of ${GN.esc(G.sides[T.si].name)}'s dial? +1 if you're right. No point if they hit the bullseye.</p>
+      <p class="center muted">Is the target <b>left</b> or <b>right</b> of their guess? +1 if right.</p>
       <div class="dialwrap">${dialSVG({ needles:[{ v:T.guesses[0].v, color:"var(--acc)", main:true }] })}</div>
       <div class="ends"><span>${GN.esc(T.spec[0])}</span><span>${GN.esc(T.spec[1])}</span></div>
       <div class="card" style="margin-top:14px">${others.map(i => `<div class="predrow"><span class="grow">${GN.sidePill(G.sides[i])}</span><div class="lr" style="width:150px"><button data-i="${i}" data-v="L" aria-pressed="${T.pred[i] === "L"}">← Left</button><button data-i="${i}" data-v="R" aria-pressed="${T.pred[i] === "R"}">Right →</button></div></div>`).join("")}</div>

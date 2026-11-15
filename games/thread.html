@@ -35,34 +35,25 @@
 const app = GN.page({ title:"Common Thread", accent:"#ff9f5a", accentInk:"#2b1200" });
 const THREADS = (window.GN_DATA && GN_DATA.threads) || [];
 const WORTH = [5, 3, 2, 1];
-const cfg = Object.assign({ count:10, penalty:true }, GN.get("thread.cfg", {}));
+const cfg = Object.assign({ count:10, penalty:false }, GN.get("thread.cfg", {}));
 const save = () => GN.set("thread.cfg", cfg);
 let G = null;
 
 function setup(){
   GN.render(`<div class="stack">
-    <div><div class="kicker">Lateral thinking · push your luck</div><h1>Common<br>Thread</h1>
-    <p class="lede">Four clues, revealed one at a time. What connects them? Lock in a guess early for big points, or wait for another clue and play it safe.</p></div>
-    <div class="card"><div class="small muted" style="margin-bottom:8px">Example: what links these?</div>
-      <div class="clues" style="margin:0"><div class="cl on"><span class="v">5</span><span class="t">Florida</span></div><div class="cl on"><span class="v">3</span><span class="t">Map</span></div><div class="cl on"><span class="v">2</span><span class="t">Piano</span></div><div class="cl on"><span class="v">1</span><span class="t">Lock</span></div></div>
-      <p class="small muted" style="margin:10px 0 0">They all have <b style="color:var(--ink)">keys</b>.</p></div>
+    <div><div class="kicker">What links them?</div><h1>Common<br>Thread</h1>
+    <p class="lede">Four clues appear one at a time. Guess the link early for more points.</p></div>
+    <div class="card"><div class="small muted" style="margin-bottom:8px">Example: Florida · Map · Piano · Lock → they all have <b style="color:var(--ink)">keys</b>.</div></div>
     <div id="roster"></div>
-    <div class="card">
-      <h3>Settings</h3>
-      <div class="setting"><div class="lab">Puzzles</div>${GN.seg("count", [6, 10, 15, 20], cfg.count)}</div>
-      <div class="setting"><div class="lab">Wrong guesses cost 1<small>Raises the stakes on locking in early.</small></div>${GN.seg("penalty", [true, false], cfg.penalty, v => v ? "On" : "Off")}</div>
-    </div>
-    <div class="note">✍️ Every ${GN.isPairs() ? "team" : "player"} needs a scrap of paper or a notes app to write their guess on when they lock in. ${GN.isPairs() ? "Partners can whisper." : ""}</div>
     <button class="btn primary big block" id="go">Start</button>
-    <details class="card rules"><summary>Rules</summary>
-      <ol>
-        <li>Put the phone where everyone can see it. Whoever's nearest taps <b>Next clue</b>.</li>
-        <li>When you think you know, <b>write your answer down</b> and tap your name to lock in. Locking in after clue 1 is worth 5, after clue 2 is worth 3, then 2, then 1.</li>
-        <li>You get one lock per puzzle, and you can't change your answer.</li>
-        <li>After clue 4, or once everyone has locked in, reveal the answer. Read your guesses out and the room judges each one. Close enough counts.</li>
-        <li>${THREADS.length} puzzles. Clues go from sneaky to obvious.</li>
-      </ol>
-    </details>
+    <div class="card rules"><h3>How to play</h3><ul>
+      <li>Tap <b>Next clue</b> to reveal clues one by one.</li>
+      <li>Think you know? Write it down and tap your name.</li>
+      <li>Lock in on clue 1 for 5 points, then 3, 2, 1.</li>
+      <li>Reveal the answer and tap ✓ if you got it.</li></ul></div>
+    <details class="card"><summary>⚙️ Options</summary>
+      <div class="setting"><div class="lab">Puzzles</div>${GN.seg("count", [6, 10, 15, 20], cfg.count)}</div>
+      <div class="setting"><div class="lab">Wrong guesses cost 1</div>${GN.seg("penalty", [false, true], cfg.penalty, v => v ? "On" : "Off")}</div></details>
   </div>`);
   GN.rosterBlock(GN.$("#roster"));
   GN.bindSegs(app, cfg, () => { save(); setup(); });
@@ -100,7 +91,7 @@ function judge(P, S){
       <div class="answer" style="margin:8px 0">${GN.esc(P.a)}</div>
       <div class="clues" style="margin:8px 0">${P.c.map(c => `<div class="cl on" style="min-height:64px"><span class="t" style="font-size:19px">${GN.esc(c)}</span></div>`).join("")}</div>
       <p class="muted">${GN.esc(P.x || "")}</p>
-      ${locked.length ? `<div class="card" style="text-align:left"><div class="small muted" style="margin-bottom:6px">Read your guesses out. Were they right?</div>
+      ${locked.length ? `<div class="card" style="text-align:left"><div class="small muted" style="margin-bottom:6px">Read your guesses. Right?</div>
         ${locked.map(i => `<div class="judge"><span class="grow">${GN.sidePill(G.sides[i])} <span class="tiny muted">for ${WORTH[S.locks[i] - 1]}</span></span>
           <div class="lr"><button class="y" data-i="${i}" data-v="1" aria-pressed="${verdict[i] === 1}">✓</button><button class="n" data-i="${i}" data-v="0" aria-pressed="${verdict[i] === 0}">✗</button></div></div>`).join("")}</div>`
         : `<p>Nobody locked in. On to the next one.</p>`}
