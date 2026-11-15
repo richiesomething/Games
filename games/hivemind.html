@@ -24,32 +24,21 @@
 <script>
 const app = GN.page({ title:"Hive Mind", accent:"#ffd23f", accentInk:"#2a2100" });
 const QS = (window.GN_DATA && GN_DATA.hivemind) || [];
-const cfg = Object.assign({ target:8, sheep:true, timer:20 }, GN.get("hivemind.cfg", {}));
+const cfg = Object.assign({ target:8, sheep:false, timer:20 }, GN.get("hivemind.cfg", {}));
 const save = () => GN.set("hivemind.cfg", cfg);
 let G = null;
 
 function setup(){
   GN.render(`<div class="stack">
-    <div><div class="kicker">Think like the herd</div><h1>Hive Mind</h1>
-    <p class="lede">“Name a famous pirate.” Everyone secretly writes an answer. You only score if you wrote what <i>most people</i> wrote. Don't be clever. Be normal.</p></div>
-    <div class="card center"><div class="hex">🐝</div><p class="small muted" style="margin:10px 0 0">Captain Hook? Blackbeard? Jack Sparrow? The whole game is guessing what everyone else will put.</p></div>
+    <div><div class="kicker">Think like the group</div><h1>Hive Mind</h1>
+    <p class="lede">Write the answer you think most people will write. Match the crowd to score.</p></div>
     <div id="roster"></div>
-    <div class="card">
-      <h3>Settings</h3>
-      <div class="setting"><div class="lab">Points to win</div>${GN.seg("target", [5, 8, 10, 12], cfg.target)}</div>
-      <div class="setting"><div class="lab">🐑 Black sheep<small>Be the only one with a different answer and you get the sheep. You can't win while you hold it.</small></div>${GN.seg("sheep", [true, false], cfg.sheep, v => v ? "On" : "Off")}</div>
-      <div class="setting"><div class="lab">Writing timer</div>${GN.seg("timer", [0, 15, 20, 30], cfg.timer, v => v ? v + "s" : "Off")}</div>
-    </div>
-    <div class="note">✍️ Everyone needs paper or a notes app. ${GN.isPairs() ? "Partners agree on one answer." : ""} Write fast, then reveal together.</div>
     <button class="btn primary big block" id="go">Start</button>
-    <details class="card rules"><summary>Rules</summary>
-      <ol>
-        <li>Read the question out loud. Everyone writes one answer, without discussing it.</li>
-        <li>On three, everyone reveals. Find the <b>biggest group</b> of matching answers. Close enough counts: "Jack Sparrow" = "Captain Jack".</li>
-        <li>Every ${GN.isPairs() ? "team" : "player"} in the biggest group gets 1 point. If two groups tie for biggest, <b>nobody</b> scores.</li>
-        <li>If exactly one ${GN.isPairs() ? "team" : "player"} wrote something nobody else did, they get the 🐑 <b>black sheep</b>. It moves to the next lone answer. You can't win while you hold it.</li>
-        <li>First to ${cfg.target} points without the sheep wins. ${QS.length} questions.</li>
-      </ol>
+    <div class="card"><h3>How to play</h3><ul class="rules" style="margin:0;padding-left:20px"><li>Read the question. Everyone writes one answer on paper.</li><li>Reveal together on three.</li><li>Everyone in the biggest matching group gets 1 point.</li><li>First to ${cfg.target} wins.</li></ul></div>
+    <details class="card"><summary>⚙️ Options</summary>
+      <div class="setting"><div class="lab">Points to win</div>${GN.seg("target", [5, 8, 10, 12], cfg.target)}</div>
+      <div class="setting"><div class="lab">🐑 Black sheep<small>The only odd answer gets the sheep and can't win while holding it.</small></div>${GN.seg("sheep", [true, false], cfg.sheep, v => v ? "On" : "Off")}</div>
+      <div class="setting"><div class="lab">Writing timer</div>${GN.seg("timer", [0, 15, 20, 30], cfg.timer, v => v ? v + "s" : "Off")}</div>
     </details>
   </div>`);
   GN.rosterBlock(GN.$("#roster"), { minSides:3 });
@@ -82,9 +71,9 @@ function tally(Q){
     GN.stage(`<div class="wrap" style="width:100%">
       <div class="small muted">${GN.esc(Q)}</div>
       <h2 style="margin:8px 0 4px">Who's in the biggest group?</h2>
-      <p class="small muted" style="margin:0 0 12px">Tap everyone who matched it. Tie for biggest? Tap nobody.</p>
+      <p class="small muted" style="margin:0 0 12px">Tap everyone in it. A tie? Tap nobody.</p>
       <div class="sidegrid">${G.sides.map((s, i) => `<button class="sidebtn" data-i="${i}" style="--sc:${s.color}" aria-pressed="${herd.has(i)}">${GN.esc(s.name)}${i === G.sheep ? ` <span class="sheep">🐑</span>` : ""}<small>${G.scores[i]} pts</small></button>`).join("")}</div>
-      ${cfg.sheep ? `<h3 style="margin:20px 0 6px">🐑 Anyone totally alone?</h3><p class="small muted" style="margin:0 0 8px">Only if exactly one person had a unique answer.</p>
+      ${cfg.sheep ? `<h3 style="margin:20px 0 6px">🐑 Anyone totally alone?</h3><p class="small muted" style="margin:0 0 8px">Only if one answer matched nobody.</p>
         <div class="chips" style="justify-content:center"><button class="chip" data-l="-1" aria-pressed="${lone === -1}">Nobody</button>${G.sides.map((s, i) => herd.has(i) ? "" : `<button class="chip" data-l="${i}" aria-pressed="${lone === i}">${GN.esc(s.name)}</button>`).join("")}</div>` : ""}
       <div class="btns"><button class="btn primary big" id="ok">Score it</button></div></div>`);
     GN.$$("[data-i]").forEach(b => b.onclick = () => { const i = +b.dataset.i; herd.has(i) ? herd.delete(i) : herd.add(i); if (herd.has(lone)) lone = -1; GN.sfx.tap(); draw(); });

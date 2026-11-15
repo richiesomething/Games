@@ -37,25 +37,16 @@ let G = null;
 
 function setup(){
   GN.render(`<div class="stack">
-    <div><div class="kicker">Loud · fast · panicky</div><h1>Hot Potato</h1>
-    <p class="lede">A prompt appears. Shout a valid answer and pass the phone to the next person. The fuse length is secret. Whoever's holding it when it blows loses a life.</p></div>
+    <div><div class="kicker">Loud & fast</div><h1>Hot Potato</h1>
+    <p class="lede">Shout an answer, pass the phone. Don't be holding it when it blows.</p></div>
     <div id="roster"></div>
-    <div class="card">
-      <h3>Settings</h3>
-      <div class="setting"><div class="lab">Lives</div>${GN.seg("lives", [2, 3, 5], cfg.lives)}</div>
-      <div class="setting"><div class="lab">Fuse<small>Longer fuses mean more laps around the circle.</small></div>${GN.seg("fuse", ["short", "mid", "long"], cfg.fuse, v => ({ short:"Short", mid:"Medium", long:"Long" })[v])}</div>
-      <div class="setting"><div class="lab">Prompt difficulty</div>${GN.seg("tier", ["mix", 1, 2, 3], cfg.tier, v => ({ mix:"Mix", 1:"Easy", 2:"Medium", 3:"Hard" })[v])}</div>
-      <div class="setting"><div class="lab">Letter twist<small>Some easy prompts get a starting letter: "A country… starting with B".</small></div>${GN.seg("letter", [false, true], cfg.letter, v => v ? "On" : "Off")}</div>
-    </div>
     <button class="btn primary big block" id="go">Light the fuse</button>
-    <details class="card rules"><summary>Rules</summary>
-      <ol>
-        <li>Sit in a circle. ${GN.isPairs() ? "Teammates sit <b>apart</b>. If it blows on either of you, your team loses a life." : ""}</li>
-        <li>The holder shouts one answer that fits the prompt, then passes the phone to their left. No repeats.</li>
-        <li>The group can shout <b>"BOGUS!"</b> at a bad answer, and the holder has to try again.</li>
-        <li>When it explodes, tap whoever was holding it. Lose all your lives and you're out, so skip over that person when passing.</li>
-        <li>${PROMPTS.length} prompts. The ticking speeds up, but that tells you nothing about when it'll blow.</li>
-      </ol>
+    <div class="card"><h3>How to play</h3><ul class="rules" style="margin:0;padding-left:20px"><li>Sit in a circle.${GN.isPairs() ? " Teammates sit apart." : ""}</li><li>Say one answer that fits the prompt, then pass the phone left.</li><li>No repeats. Bad answer? The group yells \u201cBogus!\u201d and you try again.</li><li>Holding it when it explodes? You lose a life.</li></ul></div>
+    <details class="card"><summary>⚙️ Options</summary>
+      <div class="setting"><div class="lab">Lives</div>${GN.seg("lives", [2, 3, 5], cfg.lives)}</div>
+      <div class="setting"><div class="lab">Fuse</div>${GN.seg("fuse", ["short", "mid", "long"], cfg.fuse, v => ({ short:"Short", mid:"Medium", long:"Long" })[v])}</div>
+      <div class="setting"><div class="lab">Prompt difficulty</div>${GN.seg("tier", ["mix", 1, 2, 3], cfg.tier, v => ({ mix:"Mix", 1:"Easy", 2:"Medium", 3:"Hard" })[v])}</div>
+      <div class="setting"><div class="lab">Letter twist<small>Some prompts add a starting letter.</small></div>${GN.seg("letter", [false, true], cfg.letter, v => v ? "On" : "Off")}</div>
     </details>
   </div>`);
   GN.rosterBlock(GN.$("#roster"));
@@ -122,7 +113,7 @@ function strike(i){
   GN.stage(`<div class="wrap" style="width:100%">
     <div class="kicker">${G.lives[i] ? "Ouch" : "Eliminated"}</div><h2 style="margin:6px 0 14px">${GN.esc(G.sides[i].name)} ${G.lives[i] ? `has ${G.lives[i]} li${G.lives[i] === 1 ? "fe" : "ves"} left` : "is out!"}</h2>
     <div class="board">${G.sides.map((s, k) => `<div class="srow" style="--sc:${s.color};${G.lives[k] ? "" : "opacity:.4"}"><div class="nm">${GN.esc(s.name)}</div>${livesHTML(k)}</div>`).join("")}</div>
-    <p class="muted">${GN.esc(G.sides[i].name)} ${G.lives[i] ? "starts" : "is out. The next player starts"} the next round.</p>
+    <p class="muted">${G.lives[i] ? GN.esc(G.sides[i].name) + " starts next." : "Next player starts."}</p>
     <div class="btns"><button class="btn primary big" id="nx">Next prompt</button></div></div>`);
   GN.$("#nx").onclick = next;
 }

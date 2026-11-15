@@ -26,30 +26,20 @@
 <script>
 const app = GN.page({ title:"Most Likely To", accent:"#ff8fab", accentInk:"#33040f" });
 const PROMPTS = (window.GN_DATA && GN_DATA.mostlikely) || [];
-const cfg = Object.assign({ rounds:12, predict:true }, GN.get("mostlikely.cfg", {}));
+const cfg = Object.assign({ rounds:12, predict:false }, GN.get("mostlikely.cfg", {}));
 const save = () => GN.set("mostlikely.cfg", cfg);
 let G = null;
 
 function setup(){
   GN.render(`<div class="stack">
-    <div><div class="kicker">Affectionate roasting</div><h1>Most Likely To</h1>
-    <p class="lede">“Who's most likely to accidentally join a cult?” On three, everyone points. Score by reading the room, and leave with a yearbook of superlatives.</p></div>
+    <div><div class="kicker">Point on three</div><h1>Most Likely To</h1>
+    <p class="lede">Who's most likely to…? Everyone points. Pick who the room picks to score.</p></div>
     <div id="roster"></div>
-    <div class="card">
-      <h3>Settings</h3>
-      <div class="setting"><div class="lab">Prompts</div>${GN.seg("rounds", [8, 12, 16, 20], cfg.rounds)}</div>
-      <div class="setting"><div class="lab">🔮 Hot seat prediction<small>Each round one person secretly predicts the winner first. If they're right, +2.</small></div>${GN.seg("predict", [true, false], cfg.predict, v => v ? "On" : "Off")}</div>
-    </div>
     <button class="btn primary big block" id="go" ${GN.roster().players.length < 4 ? "disabled" : ""}>Start</button>
-    <details class="card rules"><summary>Rules</summary>
-      <ol>
-        <li>Read the prompt aloud. ${cfg.predict ? "The hot-seat player has already made a secret prediction. " : ""}On three, everyone points at someone. You can't point at yourself.</li>
-        <li>Count fingers and tap whoever got the most. That person wins the superlative and it goes in the yearbook.</li>
-        <li>Everyone who pointed at the winner scores <b>1</b>. That's reading the room.</li>
-        <li>Ties: tap one winner, or skip the round if it's a mess.</li>
-        <li>Keep it affectionate. ${PROMPTS.length} prompts.</li>
-      </ol>
-      ${GN.isPairs() ? `<p>Pointing is individual. Points go to each player's team.</p>` : ""}
+    <div class="card"><h3>How to play</h3><ul class="rules" style="margin:0;padding-left:20px"><li>Read the prompt out loud.</li><li>On three, everyone points at someone (not yourself).</li><li>Whoever gets the most fingers wins it. Everyone who pointed at them gets 1 point.</li><li>Stay nice!</li></ul></div>
+    <details class="card"><summary>⚙️ Options</summary>
+      <div class="setting"><div class="lab">Prompts</div>${GN.seg("rounds", [8, 12, 16, 20], cfg.rounds)}</div>
+      <div class="setting"><div class="lab">🔮 Secret prediction<small>One player predicts the winner first, for +2.</small></div>${GN.seg("predict", [true, false], cfg.predict, v => v ? "On" : "Off")}</div>
     </details>
   </div>`);
   GN.rosterBlock(GN.$("#roster"), { onChange:setup });

@@ -33,30 +33,21 @@
 const app = GN.page({ title:"Chronology", accent:"#ffb84d", accentInk:"#2a1700" });
 const EVENTS = (window.GN_DATA && GN_DATA.events) || [];
 const TAGS = { history:"🏛️ History", science:"🔬 Science", tech:"💡 Tech", culture:"🎭 Culture", sports:"🏅 Sports", music:"🎵 Music", film:"🎬 Film & TV", food:"🍽️ Food", business:"💼 Business", space:"🚀 Space" };
-const cfg = Object.assign({ target:7, steal:true }, GN.get("chronology.cfg", {}));
+const cfg = Object.assign({ target:7, steal:false }, GN.get("chronology.cfg", {}));
 const save = () => GN.set("chronology.cfg", cfg);
 const yr = y => y < 0 ? `${-y} BC` : String(y);
 let G = null;
 
 function setup(){
   GN.render(`<div class="stack">
-    <div><div class="kicker">History · gut instinct</div><h1>Chronology</h1>
-    <p class="lede">Every side builds its own timeline. Draw an event and slot it in where you think it belongs. Right, and it stays. Wrong, and it's gone. Which came first, the fax machine or the American Civil War?</p></div>
+    <div><div class="kicker">History</div><h1>Chronology</h1>
+    <p class="lede">Put events in the right order on your timeline. Most cards wins.</p></div>
     <div id="roster"></div>
-    <div class="card">
-      <h3>Settings</h3>
-      <div class="setting"><div class="lab">Cards to win<small>Including your starting card.</small></div>${GN.seg("target", [5, 7, 9, 11], cfg.target)}</div>
-      <div class="setting"><div class="lab">Steals<small>Miss, and the next side can try to place that event in <i>their</i> timeline.</small></div>${GN.seg("steal", [true, false], cfg.steal, v => v ? "On" : "Off")}</div>
-    </div>
     <button class="btn primary big block" id="go">Deal starting cards</button>
-    <details class="card rules"><summary>Rules</summary>
-      <ol>
-        <li>Each side starts with one event, year showing.</li>
-        <li>On your turn, an event is drawn with its year hidden. Tap the gap where it fits in your timeline.</li>
-        <li>Correct: it joins your timeline. Wrong: it's discarded${cfg.steal ? ", unless the next side steals it" : ""}.</li>
-        <li>When someone reaches ${cfg.target} cards, finish the lap so everyone gets equal turns. Most cards wins.</li>
-        <li>Same-year events can go either way round. ${EVENTS.length} events from ancient Rome to 2024.</li>
-      </ol>
+    <div class="card"><h3>How to play</h3><ul class="rules" style="margin:0;padding-left:20px"><li>Everyone starts with one event and its year.</li><li>On your turn, you get a new event. Tap where it fits in your timeline.</li><li>Right: you keep it. Wrong: it's gone.</li><li>First to ${cfg.target} cards wins.</li></ul></div>
+    <details class="card"><summary>⚙️ Options</summary>
+      <div class="setting"><div class="lab">Cards to win</div>${GN.seg("target", [5, 7, 9, 11], cfg.target)}</div>
+      <div class="setting"><div class="lab">Steals<small>Miss, and the next side can try it.</small></div>${GN.seg("steal", [true, false], cfg.steal, v => v ? "On" : "Off")}</div>
     </details>
   </div>`);
   GN.rosterBlock(GN.$("#roster"));
@@ -88,7 +79,7 @@ function place(si, ev, stealing){
     <div class="row between"><span>${GN.sidePill(s)}</span><span class="kicker">${stealing ? "🦝 Steal attempt!" : `${line.length} / ${cfg.target} cards`}</span></div>
     <div class="prog" style="--sc:${s.color};margin:10px 0">${Array.from({ length:cfg.target }, (_, k) => `<i class="${k < line.length ? "on" : ""}"></i>`).join("")}</div>
     <div class="bigcard" style="margin:12px 0;padding:22px 18px"><div class="tag">${TAGS[ev.t] || ""}</div><div class="ev">${GN.esc(ev.e)}</div></div>
-    <div class="small muted">${stealing ? "The last side missed it. Place it in your own timeline:" : "Where does it go?"}</div>
+    <div class="small muted">${stealing ? "Steal it! Where does it go in yours?" : "Where does it go?"}</div>
     <div class="tl">${Array.from({ length:gaps }, (_, k) => `<button class="gap" data-k="${k}">↳ ${label(k)}</button>${k < line.length ? `<div class="item"><span class="y">${yr(line[k].y)}</span><span class="e">${GN.esc(line[k].e)}</span></div>` : ""}`).join("")}</div></div>`);
   GN.$$(".gap").forEach(b => b.onclick = () => judge(si, ev, line, +b.dataset.k, stealing));
 }
@@ -107,7 +98,7 @@ function judge(si, ev, line, k, stealing){
     <h2 style="margin:4px 0">${ok ? "Nailed it" : "Not quite"}: ${yr(ev.y)}</h2>
     <p class="muted" style="margin:0">${GN.esc(ev.e)}</p>
     <div class="tl">${shown.map(x => `<div class="item${x === ev ? (ok ? " new" : " bad") : ""}" style="margin:3px 0"><span class="y">${yr(x.y)}</span><span class="e">${GN.esc(x.e)}</span></div>`).join("")}</div>
-    ${G.ending && ok && G.lines[si].length >= cfg.target ? `<p class="note" style="margin-top:12px">${GN.esc(s.name)} reached ${cfg.target}! Finishing this lap so everyone gets the same number of turns.</p>` : ""}
+    ${G.ending && ok && G.lines[si].length >= cfg.target ? `<p class="note" style="margin-top:12px">${GN.esc(s.name)} hit ${cfg.target}! Last lap so everyone gets a fair turn.</p>` : ""}
     <div class="card" style="text-align:left;margin-top:12px">${GN.board(G.sides, counts(), { up:si })}</div>
     <div class="btns">${canSteal ? `<button class="btn primary big" id="steal">${GN.esc(G.sides[stealer].name)}: try to steal it</button><button class="btn" id="nx">No steal, next turn</button>` : `<button class="btn primary big" id="nx">Next turn</button>`}</div></div>`);
   const advance = () => { G.turn = stealing ? G.turn : G.turn; G.turn++; turn(); };
