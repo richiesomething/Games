@@ -26,15 +26,17 @@ Plain HTML/CSS/JS. No build step, no server, no accounts. Open `index.html` or h
 
 | | |
 |---|---|
-| Forehead / Fishbowl / 20Q cards | 1,687 across 24 decks, each with 4 forbidden words |
+| Forehead / Fishbowl / 20Q cards | 2,334 across 34 decks, each with 4 forbidden words |
 | Categories | 873 |
+| Hive Mind questions | 628 |
 | Hot Potato prompts | 455 (three difficulty tiers) |
-| Spectrums | 320 |
-| Imposter sets | 104 × 16 words |
+| Ballpark questions | 429 |
+| Most Likely To prompts | 404 |
 | Common Thread puzzles | 358 |
-| Fictionary words | 312 |
-| Ballpark questions | 431 |
-| Chronology events | 765 |
+| Spectrums | 320 |
+| Fictionary words | 304 |
+| Imposter sets | 104 × 16 words |
+| Chronology events | 763 |
 
 Each game remembers (per device) which cards it has dealt and works through the whole pool before repeating.
 
