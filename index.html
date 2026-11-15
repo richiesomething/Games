@@ -34,6 +34,14 @@
 .tips li{color:var(--mute);margin:6px 0}
 .tips b{color:var(--ink)}
 .sec{margin-top:28px}
+.g.pick{outline:3px solid var(--gc);transform:scale(1.02)}
+.g.chosen{animation:chosen .7s ease 2}
+@keyframes chosen{50%{transform:scale(1.05);box-shadow:0 0 0 6px color-mix(in srgb,var(--gc) 40%,transparent)}}
+.awards{display:grid;gap:6px;margin-top:10px}
+.award{display:flex;gap:10px;align-items:center;background:var(--panel2);border-radius:12px;padding:8px 12px}
+.award .e{font-size:24px}
+.award b{display:block}
+.award span{color:var(--mute);font-size:13px}
 </style>
 </head>
 <body>
@@ -50,7 +58,8 @@
   </div>
 
   <section class="sec">
-    <div class="row between"><h2>Pick a game</h2><div class="chips" id="filters"></div></div>
+    <div class="row between"><h2>Pick a game</h2><button class="btn sm primary" id="surprise">🎲 Surprise me</button></div>
+    <div class="chips" id="filters" style="margin-top:10px"></div>
     <div class="games" id="games"></div>
   </section>
 
@@ -83,9 +92,11 @@ const GAMES = [
   { id:"imposter",   nm:"Imposter",        ic:"🕵️", c:"#f4a3d6", like:"Like The Chameleon · Spyfall", p:"Everyone knows the secret word except one person. Say one word each, then vote. If the imposter is caught, they can still win by guessing the word.", tags:["bluffing","deduction"], t:"15–30 min" },
   { id:"ballpark",   nm:"Ballpark",        ic:"📏", c:"#6fb6ff", like:"Like Wits & Wagers", p:"How tall is Everest in feet? What year was Coca-Cola invented? Everyone secretly guesses and the closest wins.", tags:["thinky","trivia"], t:"15–30 min" },
   { id:"hotpotato",  nm:"Hot Potato",      ic:"💣", c:"#ff5d6c", like:"Like Catch Phrase · Pass the Bomb", p:"Shout an answer, pass the phone. The fuse is secret. Whoever is holding it when it blows takes a strike.", tags:["loud","words"], t:"10–20 min" },
+  { id:"hivemind",   nm:"Hive Mind",       ic:"🐝", c:"#ffd23f", like:"Like Herd Mentality", p:"\u201cName a famous pirate.\u201d You only score if you match what most people wrote. Be alone and you get the black sheep.", tags:["social","loud","paper"], t:"15–30 min" },
+  { id:"mostlikely", nm:"Most Likely To",  ic:"👉", c:"#ff8fab", like:"Party classic, with scoring", p:"Who's most likely to accidentally join a cult? Point on three, score for reading the room, and leave with a yearbook of superlatives.", tags:["social","loud"], t:"15–25 min" },
   { id:"chronology", nm:"Chronology",      ic:"⏳", c:"#ffb84d", like:"Like Timeline", p:"Which came first, the fax machine or the Civil War? Fit each event into your timeline. First to a full timeline wins.", tags:["thinky","trivia"], t:"20–30 min" },
 ];
-const FILTERS = [["all","All"],["loud","Loud & fast"],["thinky","Thinky"],["bluffing","Bluffing"],["words","Wordplay"],["trivia","Trivia-ish"]];
+const FILTERS = [["all","All"],["social","Social"],["loud","Loud & fast"],["thinky","Thinky"],["bluffing","Bluffing"],["words","Wordplay"],["trivia","Trivia-ish"]];
 let filter = "all";
 
 function drawGames(){
@@ -96,10 +107,25 @@ function drawGames(){
     <a class="g" href="games/${g.id}.html" style="--gc:${g.c}">
       <div class="top"><div class="ic">${g.ic}</div><div><div class="nm">${g.nm}</div><div class="like">${g.like}</div></div></div>
       <p>${g.p}</p>
-      <div class="pillrow"><span class="pill">${g.t}</span>${g.id==="imposter"?`<span class="pill">always individual</span>`:`<span class="pill">solo or pairs</span>`}${g.tags.includes("paper")?`<span class="pill">pens help</span>`:""}</div>
+      <div class="pillrow"><span class="pill">${g.t}</span>${g.id==="imposter"||g.id==="mostlikely"?`<span class="pill">everyone votes</span>`:`<span class="pill">solo or pairs</span>`}${g.tags.includes("paper")?`<span class="pill">pens help</span>`:""}</div>
     </a>`).join("");
 }
 
+const AWARDS = [
+  { e:"🎭", t:"Master of Deception", s:"best at bluffing games", g:["fictionary","imposter"] },
+  { e:"🧠", t:"Big Brain", s:"trivia & lateral thinking", g:["thread","ballpark","chronology","twenty"] },
+  { e:"📣", t:"Loudest in the Room", s:"fast & loud games", g:["forehead","fishbowl","hotpotato"] },
+  { e:"🔮", t:"Mind Reader", s:"knows how everyone thinks", g:["spectrum","hivemind","mostlikely"] },
+  { e:"✍️", t:"Wordsmith", s:"Categories champion", g:["categories"] },
+];
+function awardsHTML(N){
+  const out = AWARDS.map(a => { const tot = {};
+    N.games.filter(g => a.g.includes(g.game)).forEach(g => g.results.forEach(r => r.members.forEach(m => tot[m] = (tot[m] || 0) + r.night)));
+    const best = Object.entries(tot).sort((x, y) => y[1] - x[1]); if (!best.length || !best[0][1]) return "";
+    const tied = best.filter(b => b[1] === best[0][1]).map(b => b[0]);
+    return `<div class="award"><span class="e">${a.e}</span><div><b>${a.t}: ${tied.map(GN.esc).join(" & ")}</b><span>${a.s}</span></div></div>`; }).join("");
+  return out ? `<h3 style="margin:14px 0 0">Tonight's awards</h3><div class="awards">${out}</div>` : "";
+}
 function drawStandings(){
   const N = GN.night();
   const el = GN.$("#standings");
@@ -109,11 +135,21 @@ function drawStandings(){
   }
   el.innerHTML = `<div class="row between"><h3 style="margin:0">Tonight's standings</h3><button class="link small" id="reset">New night</button></div>
     <div style="margin-top:8px">${N.players.map((p,i) => `<div class="standrow"><span class="muted" style="width:22px;font-weight:800">${i+1}</span><span class="n">${GN.esc(p.name)}${i===0?" 👑":""}<div class="tiny muted">${p.wins} win${p.wins===1?"":"s"} · ${p.games} game${p.games===1?"":"s"}</div></span><b>${p.night}</b></div>`).join("")}</div>
+    ${awardsHTML(N)}
     <details style="margin-top:10px"><summary class="small muted" style="cursor:pointer">Games played (${N.games.length})</summary>
       <ul class="hist">${N.games.slice().reverse().map(g => `<li><b style="color:var(--ink)">${GN.esc(g.name)}</b>: ${g.results.filter(r=>r.rank===0).map(r=>GN.esc(r.name)).join(" & ")} won (${g.results.map(r=>GN.esc(r.name)+" "+r.pts).join(", ")})</li>`).join("")}</ul></details>`;
   GN.$("#reset").onclick = () => { if (confirm("Start a new game night? This clears tonight's standings.")) { GN.resetNight(); drawStandings(); } };
 }
 
+GN.$("#surprise").onclick = () => {
+  const tiles = GN.$$("#games .g"); if (!tiles.length) return;
+  const played = new Set(GN.get("night", []).map(g => g.game));
+  const fresh = tiles.filter(t => !played.has(t.getAttribute("href").replace(/^games\/|\.html$/g, "")));
+  const target = GN.pick(fresh.length ? fresh : tiles); let k = 0; const steps = 14 + (Math.random() * 6 | 0);
+  tiles.forEach(t => t.classList.remove("pick", "chosen"));
+  (function hop(){ tiles.forEach(t => t.classList.remove("pick")); const t = k < steps ? GN.pick(tiles) : target; t.classList.add("pick"); GN.tone(500 + k * 25, .04, "triangle", .06);
+    if (k++ < steps) setTimeout(hop, 60 + k * 9); else { t.classList.add("chosen"); t.scrollIntoView({ behavior:"smooth", block:"center" }); GN.sfx.good(); GN.toast("Tonight's pick: " + t.querySelector(".nm").textContent + "! Tap it to play"); } })();
+};
 GN.rosterEditor(GN.$("#roster"), { onChange: drawGames });
 drawGames(); drawStandings();
 </script>

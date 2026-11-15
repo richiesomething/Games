@@ -35,7 +35,7 @@
 <script src="../assets/js/parlor.js"></script>
 <script>
 const app = GN.page({ title:"Fictionary", accent:"#5eead4", accentInk:"#032a24" });
-const WORDS = (window.GN_DATA && GN_DATA.words) || [];
+const WORDS = ((window.GN_DATA && GN_DATA.words) || []).filter(w => w.w !== "Gongoozler"); // used as the example on the intro screen
 const cfg = Object.assign({ mode:"type", rounds:1, timer:120 }, GN.get("fictionary.cfg", {}));
 const save = () => GN.set("fictionary.cfg", cfg);
 let G = null;
@@ -44,8 +44,8 @@ function setup(){
   GN.render(`<div class="stack">
     <div><div class="kicker">Bluffing · wordplay</div><h1>Fictionary</h1>
     <p class="lede">A real but wildly obscure word. Everyone writes a fake definition that sounds right. Then find the real one among the fakes, and fool as many friends as you can.</p></div>
-    <div class="card center"><div class="dword" style="font-size:40px">Groak</div><div class="pos">verb</div>
-      <p class="small muted" style="margin:8px 0 0">Is it (a) to croak like a frog with a cold, (b) to watch silently while someone eats, hoping they'll share, or (c) a Norse wool cloak?</p></div>
+    <div class="card center"><div class="dword" style="font-size:40px">Gongoozler</div><div class="pos">noun</div>
+      <p class="small muted" style="margin:8px 0 0">Is it (a) a Victorian gong-maker, (b) someone who enjoys idly watching boats on canals, or (c) a goose that won't stop honking? (It's b.)</p></div>
     <div id="roster"></div>
     <div class="card">
       <h3>Settings</h3>

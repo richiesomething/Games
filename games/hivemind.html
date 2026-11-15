@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Hive Mind · Parlor</title>
+<meta name="theme-color" content="#14111f">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐝</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700;9..144,800&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/css/parlor.css">
+<style>
+.q{font-family:var(--display);font-weight:800;font-size:clamp(30px,8.5vw,46px);line-height:1.08;text-wrap:balance}
+.hex{display:inline-grid;place-items:center;width:84px;height:94px;background:var(--acc);color:var(--acc-ink);clip-path:polygon(50% 0,100% 25%,100% 75%,50% 100%,0 75%,0 25%);font-size:40px}
+.sheep{font-size:13px;font-weight:800}
+.goal{display:flex;gap:3px;margin-top:4px}
+.goal i{flex:1;height:6px;border-radius:3px;background:var(--line)} .goal i.on{background:var(--sc)}
+</style>
+</head>
+<body>
+<main class="wrap" id="app"></main>
+<script src="../assets/data/hivemind.js"></script>
+<script src="../assets/js/parlor.js"></script>
+<script>
+const app = GN.page({ title:"Hive Mind", accent:"#ffd23f", accentInk:"#2a2100" });
+const QS = (window.GN_DATA && GN_DATA.hivemind) || [];
+const cfg = Object.assign({ target:8, sheep:true, timer:20 }, GN.get("hivemind.cfg", {}));
+const save = () => GN.set("hivemind.cfg", cfg);
+let G = null;
+
+function setup(){
+  GN.render(`<div class="stack">
+    <div><div class="kicker">Think like the herd</div><h1>Hive Mind</h1>
+    <p class="lede">“Name a famous pirate.” Everyone secretly writes an answer. You only score if you wrote what <i>most people</i> wrote. Don't be clever. Be normal.</p></div>
+    <div class="card center"><div class="hex">🐝</div><p class="small muted" style="margin:10px 0 0">Captain Hook? Blackbeard? Jack Sparrow? The whole game is guessing what everyone else will put.</p></div>
+    <div id="roster"></div>
+    <div class="card">
+      <h3>Settings</h3>
+      <div class="setting"><div class="lab">Points to win</div>${GN.seg("target", [5, 8, 10, 12], cfg.target)}</div>
+      <div class="setting"><div class="lab">🐑 Black sheep<small>Be the only one with a different answer and you get the sheep. You can't win while you hold it.</small></div>${GN.seg("sheep", [true, false], cfg.sheep, v => v ? "On" : "Off")}</div>
+      <div class="setting"><div class="lab">Writing timer</div>${GN.seg("timer", [0, 15, 20, 30], cfg.timer, v => v ? v + "s" : "Off")}</div>
+    </div>
+    <div class="note">✍️ Everyone needs paper or a notes app. ${GN.isPairs() ? "Partners agree on one answer." : ""} Write fast, then reveal together.</div>
+    <button class="btn primary big block" id="go">Start</button>
+    <details class="card rules"><summary>Rules</summary>
+      <ol>
+        <li>Read the question out loud. Everyone writes one answer, without discussing it.</li>
+        <li>On three, everyone reveals. Find the <b>biggest group</b> of matching answers. Close enough counts: "Jack Sparrow" = "Captain Jack".</li>
+        <li>Every ${GN.isPairs() ? "team" : "player"} in the biggest group gets 1 point. If two groups tie for biggest, <b>nobody</b> scores.</li>
+        <li>If exactly one ${GN.isPairs() ? "team" : "player"} wrote something nobody else did, they get the 🐑 <b>black sheep</b>. It moves to the next lone answer. You can't win while you hold it.</li>
+        <li>First to ${cfg.target} points without the sheep wins. ${QS.length} questions.</li>
+      </ol>
+    </details>
+  </div>`);
+  GN.rosterBlock(GN.$("#roster"), { minSides:3 });
+  GN.bindSegs(app, cfg, () => { save(); setup(); });
+  GN.$("#go").onclick = start;
+}
+function start(){
+  const sides = GN.sides(); if (sides.length < 3) return GN.toast("Needs at least 3 sides");
+  G = { sides, scores:sides.map(() => 0), sheep:-1, n:0, dealer:GN.dealer("hivemind", QS) };
+  GN._wantWake = true; GN.wake(true);
+  question();
+}
+function winner(){ const c = G.sides.map((_, i) => i).filter(i => G.scores[i] >= cfg.target && i !== G.sheep); if (!c.length) return null; const best = Math.max(...c.map(i => G.scores[i])); return c.filter(i => G.scores[i] === best); }
+function question(){
+  const w = winner(); if (w) return GN.finish({ gameId:"hivemind", gameName:"Hive Mind", sides:G.sides, scores:G.scores, onRematch:start, note:`${G.n} questions.${G.sheep >= 0 ? ` ${GN.esc(G.sides[G.sheep].name)} finished with the sheep 🐑.` : ""}` });
+  const Q = G.dealer.next(); G.n++; let T = null;
+  GN.stage(`<div class="wrap" style="width:100%">
+    <div class="kicker">Question ${G.n}</div>
+    <div class="q" style="margin:18px 0">${GN.esc(Q)}</div>
+    ${cfg.timer ? `<div class="clock" id="clk" style="font-size:56px">${cfg.timer}</div>` : ""}
+    <p class="muted">Write one answer. No talking!</p>
+    <div class="btns two"><button class="btn" id="skip">Skip question</button><button class="btn primary" id="rev">Reveal on 3</button></div></div>`);
+  if (cfg.timer) T = GN.timer({ seconds:cfg.timer, warn:5, onTick:l => { const c = GN.$("#clk"); if (c) { c.textContent = Math.ceil(l); c.classList.toggle("low", l <= 5); } }, onEnd:() => { GN.sfx.buzz(); GN.vibe(200); } });
+  GN.$("#skip").onclick = () => { if (T) T.stop(); G.n--; question(); };
+  GN.$("#rev").onclick = () => { if (T) T.stop(); GN.countdown("Reveal!", "Hold up your answers", () => tally(Q)); };
+}
+function tally(Q){
+  const herd = new Set(); let lone = -1;
+  const draw = () => {
+    GN.stage(`<div class="wrap" style="width:100%">
+      <div class="small muted">${GN.esc(Q)}</div>
+      <h2 style="margin:8px 0 4px">Who's in the biggest group?</h2>
+      <p class="small muted" style="margin:0 0 12px">Tap everyone who matched it. Tie for biggest? Tap nobody.</p>
+      <div class="sidegrid">${G.sides.map((s, i) => `<button class="sidebtn" data-i="${i}" style="--sc:${s.color}" aria-pressed="${herd.has(i)}">${GN.esc(s.name)}${i === G.sheep ? ` <span class="sheep">🐑</span>` : ""}<small>${G.scores[i]} pts</small></button>`).join("")}</div>
+      ${cfg.sheep ? `<h3 style="margin:20px 0 6px">🐑 Anyone totally alone?</h3><p class="small muted" style="margin:0 0 8px">Only if exactly one person had a unique answer.</p>
+        <div class="chips" style="justify-content:center"><button class="chip" data-l="-1" aria-pressed="${lone === -1}">Nobody</button>${G.sides.map((s, i) => herd.has(i) ? "" : `<button class="chip" data-l="${i}" aria-pressed="${lone === i}">${GN.esc(s.name)}</button>`).join("")}</div>` : ""}
+      <div class="btns"><button class="btn primary big" id="ok">Score it</button></div></div>`);
+    GN.$$("[data-i]").forEach(b => b.onclick = () => { const i = +b.dataset.i; herd.has(i) ? herd.delete(i) : herd.add(i); if (herd.has(lone)) lone = -1; GN.sfx.tap(); draw(); });
+    GN.$$("[data-l]").forEach(b => b.onclick = () => { lone = +b.dataset.l; GN.sfx.tap(); draw(); });
+    GN.$("#ok").onclick = () => {
+      const delta = G.sides.map((_, i) => herd.has(i) ? 1 : 0); delta.forEach((d, i) => G.scores[i] += d);
+      let msg = herd.size ? `${herd.size} in the hive!` : "No clear herd. Nobody scores.";
+      if (cfg.sheep && lone >= 0 && lone !== G.sheep) { msg += ` 🐑 The sheep goes to ${GN.esc(G.sides[lone].name)}.`; G.sheep = lone; GN.tone(220, .4, "triangle", .15); }
+      else if (herd.size) GN.sfx.good();
+      GN.stage(`<div class="wrap" style="width:100%"><div class="kicker">${GN.esc(Q)}</div><h2 style="margin:8px 0 14px">${msg}</h2>
+        <div class="board">${G.sides.map((s, i) => `<div class="srow" style="--sc:${s.color}"><div class="nm">${GN.esc(s.name)} ${i === G.sheep ? "🐑" : ""}<div class="goal" style="--sc:${s.color}">${Array.from({ length:cfg.target }, (_, k) => `<i class="${k < G.scores[i] ? "on" : ""}"></i>`).join("")}</div></div>${delta[i] ? `<span class="delta">+1</span>` : ""}<span class="pts">${G.scores[i]}</span></div>`).join("")}</div>
+        <div class="btns"><button class="btn primary big" id="nx">${winner() ? "We have a winner 🐝" : "Next question"}</button></div></div>`);
+      GN.$("#nx").onclick = question;
+    };
+  };
+  draw();
+}
+setup();
+</script>
+</body>
+</html>

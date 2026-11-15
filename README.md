@@ -8,10 +8,10 @@ Plain HTML/CSS/JS. No build step, no server, no accounts. Open `index.html` or h
 
 | Game | In the spirit of | What it's like |
 |---|---|---|
-| 🤳 **Forehead** | Heads Up, Taboo | Phone on your forehead (tilt to score) or clue-giver mode with forbidden words. 24 decks. |
+| 🤳 **Forehead** | Heads Up, Taboo | Phone on your forehead (tilt to score) or clue-giver mode with forbidden words. Golden ⭐ double cards and a double-points finale. |
 | 🐟 **Fishbowl** | Monikers, Celebrity | Write names into the bowl, then three rounds: describe → one word → charades (+ optional sounds-only). |
 | ❓ **Twenty Questions** | the classic | Hot-seat version. Solve early for more points; the answerer scores if it's solved in the Q8–16 "sweet spot". |
-| 📝 **Categories** | Scattergories | Random letter, 8–15 categories, timer, guided scoring. Other phones can follow along with a round code. |
+| 📝 **Categories** | Scattergories | Random letter, 8–15 categories, timer, guided scoring. Twist rounds (star category, two letters, speed round, ends-with). Other phones can follow along with a round code. |
 | 🎯 **Spectrum** | Wavelength | Secret target on a dial between two extremes; one clue; partner turns the dial. Left/right side bets. |
 | 🧵 **Common Thread** | Only Connect | Four clues, one at a time. Lock in early for 5/3/2/1 points; wrong locks cost 1. |
 | 📖 **Fictionary** | Balderdash | Obscure real words. Type fake definitions on the phone (auto-shuffled, auto-scored) or use paper. |
@@ -19,6 +19,8 @@ Plain HTML/CSS/JS. No build step, no server, no accounts. Open `index.html` or h
 | 📏 **Ballpark** | Wits & Wagers | Secret numeric guesses, number-line reveal, closest wins (or "no going over"). |
 | 💣 **Hot Potato** | Catch Phrase, Pass the Bomb | Shout an answer, pass the phone, secret fuse, lives. |
 | ⏳ **Chronology** | Timeline | Slot events into your own timeline. Steals on misses. |
+| 🐝 **Hive Mind** | Herd Mentality | Write what you think *most people* will write. Lone answers get the black sheep 🐑. |
+| 👉 **Most Likely To** | party classic | Point on three; score for reading the room; a hot-seat prediction; ends with a superlatives yearbook. |
 
 ## Content
 
@@ -40,6 +42,7 @@ Each game remembers (per device) which cards it has dealt and works through the 
 
 - **Players & teams** are set once on the home page (or inline in any game) and shared by every game. Teams of two are formed in order; "Shuffle teams" re-pairs them, and an odd count makes one trio. Team names are editable.
 - **Game-night standings**: each finished game awards placement points (5 / 3 / 2 / 1) to every member of each side, so standings survive team reshuffles. "New night" resets them.
+- **Surprise me** picks a game you haven't played tonight; **tonight's awards** (Master of Deception, Big Brain, Mind Reader…) appear in the standings.
 - Everything is stored in `localStorage` on the device. Nothing is sent anywhere.
 
 ```

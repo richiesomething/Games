@@ -31,22 +31,40 @@
 const app = GN.page({ title:"Categories", accent:"#7ae582", accentInk:"#062a10" });
 const CATS = (window.GN_DATA && GN_DATA.categories) || [];
 const EASY = "ABCDEFGHIJKLMNOPRSTW", ALL = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-const cfg = Object.assign({ count:12, time:180, rounds:3, hard:false }, GN.get("categories.cfg", {}));
+const cfg = Object.assign({ count:12, time:180, rounds:3, hard:false, twists:true }, GN.get("categories.cfg", {}));
 const save = () => GN.set("categories.cfg", cfg);
 const CODECH = "ABCDEFGHJKMNPQRSTVWXYZ";
 let G = null;
 
 /* A round is fully determined by its code, so other phones can show the same list. */
-function makeCode(){ return Array.from({ length:4 }, () => GN.pick(CODECH.split(""))).join("") + String(cfg.count).padStart(2, "0") + (cfg.hard ? "H" : ""); }
+/* Twists keep later rounds fresh. Weighted so plain rounds still happen. */
+const TWISTS = [
+  { id:"none", w:4 },
+  { id:"star", w:3, name:"⭐ Star category", rule:"One category is worth double. It's marked with a star." },
+  { id:"two", w:2, name:"✌️ Two letters", rule:"Answers can start with either letter." },
+  { id:"speed", w:2, name:"⚡ Speed round", rule:"Half the time, but every point counts double." },
+  { id:"end", w:1, name:"🔚 Ends with", rule:"Answers must END with the letter, not start with it." },
+  { id:"alli", w:2, name:"🎯 Alliteration bonus", rule:"Two-word answers where both words start with the letter score 3." },
+];
+function makeCode(twist){ return Array.from({ length:4 }, () => GN.pick(CODECH.split(""))).join("") + String(cfg.count).padStart(2, "0") + (cfg.hard ? "H" : "") + (twist ? "T" : ""); }
 function fromCode(code){
   code = code.toUpperCase().replace(/[^A-Z0-9]/g, "");
-  const m = code.match(/^([A-Z]{4})(\d{2})(H?)$/); if (!m) return null;
+  const m = code.match(/^([A-Z]{4})(\d{2})(H?)(T?)$/); if (!m) return null;
   const r = GN.rng("parlor-cat-" + m[1]); const count = GN.clamp(+m[2], 4, 20);
   const letters = m[3] ? ALL : EASY;
   const letter = letters[Math.floor(r() * letters.length)];
   const cats = GN.seededShuffle(CATS, r).slice(0, count);
-  return { code:m[1] + m[2] + m[3], letter, cats };
+  let twist = TWISTS[0];
+  if (m[4]) { const tot = TWISTS.reduce((a, t) => a + t.w, 0); let x = r() * tot; twist = TWISTS.find(t => (x -= t.w) < 0) || TWISTS[0]; }
+  const letter2 = twist.id === "two" ? EASY.replace(letter, "")[Math.floor(r() * (EASY.length - 1))] : null;
+  const star = Math.floor(r() * count);
+  return { code:m[1] + m[2] + m[3] + m[4], letter, letter2, cats, twist, star };
 }
+const letterLabel = R => R.letter2 ? R.letter + " / " + R.letter2 : R.letter;
+const catMult = (R, i) => (R.twist.id === "star" && i === R.star ? 2 : 1) * (R.twist.id === "speed" ? 2 : 1);
+const roundTime = R => R.twist.id === "speed" ? Math.round(cfg.time / 2) : cfg.time;
+const twistHTML = R => R.twist.id !== "none" ? `<div class="note" style="margin:12px 0;text-align:left"><b>${R.twist.name}</b><br>${R.twist.rule}</div>` : "";
+const catList = R => `<ol class="clist">${R.cats.map((c, i) => `<li>${GN.esc(c)}${R.twist.id === "star" && i === R.star ? " ⭐×2" : ""}</li>`).join("")}</ol>`;
 const pretty = c => c.slice(0, 4) + "·" + c.slice(4);
 
 function setup(){
@@ -60,6 +78,7 @@ function setup(){
       <div class="setting"><div class="lab">Time to write</div>${GN.seg("time", [120, 180, 240], cfg.time, v => v / 60 + " min")}</div>
       <div class="setting"><div class="lab">Rounds</div>${GN.seg("rounds", [1, 2, 3, 4], cfg.rounds)}</div>
       <div class="setting"><div class="lab">Hard letters<small>Allow Q, U, V, X, Y, Z</small></div>${GN.seg("hard", [false, true], cfg.hard, v => v ? "On" : "Off")}</div>
+      <div class="setting"><div class="lab">Twist rounds<small>From round 2: star categories, two letters, speed rounds, "ends with" and more.</small></div>${GN.seg("twists", [true, false], cfg.twists, v => v ? "On" : "Off")}</div>
     </div>
     <div class="note">📝 Each ${GN.isPairs() ? "team" : "player"} needs paper and a pen, or a notes app. Number your lines 1 to ${cfg.count}. ${GN.isPairs() ? "Partners write one shared list." : ""}</div>
     <button class="btn primary big block" id="go">Roll the first letter</button>
@@ -88,11 +107,11 @@ function setup(){
 /* follower phone: just the letter, the list and a timer */
 function follow(R){
   let T = null;
-  GN.render(`<div class="center"><div class="kicker">Round ${pretty(R.code)}</div><div class="letter">${R.letter}</div></div>
-    <div class="sticky row between"><span class="minilet">${R.letter}</span><span class="clock" id="clk" style="font-size:34px">${GN.fmtTime(cfg.time)}</span><button class="btn sm" id="t">Start timer</button></div>
-    <ol class="clist">${R.cats.map(c => `<li>${GN.esc(c)}</li>`).join("")}</ol>
+  GN.render(`<div class="center"><div class="kicker">Round ${pretty(R.code)}</div><div class="letter"${R.letter2 ? ' style="font-size:90px;width:auto;padding:0 20px"' : ""}>${letterLabel(R)}</div></div>${twistHTML(R)}
+    <div class="sticky row between"><span class="minilet">${R.letter}</span><span class="clock" id="clk" style="font-size:34px">${GN.fmtTime(roundTime(R))}</span><button class="btn sm" id="t">Start timer</button></div>
+    ${catList(R)}
     <div class="btns"><button class="btn" id="leave">Leave</button></div>`);
-  GN.$("#t").onclick = () => { if (T) return; T = GN.timer({ seconds:cfg.time, warn:10, onTick:l => { const c = GN.$("#clk"); if (c) { c.textContent = GN.fmtTime(l); c.classList.toggle("low", l <= 15); } }, onEnd:() => { GN.sfx.buzz(); GN.vibe(400); } }); GN.$("#t").disabled = true; };
+  GN.$("#t").onclick = () => { if (T) return; T = GN.timer({ seconds:roundTime(R), warn:10, onTick:l => { const c = GN.$("#clk"); if (c) { c.textContent = GN.fmtTime(l); c.classList.toggle("low", l <= 15); } }, onEnd:() => { GN.sfx.buzz(); GN.vibe(400); } }); GN.$("#t").disabled = true; };
   GN.$("#leave").onclick = () => { if (T) T.stop(); setup(); };
 }
 
@@ -103,28 +122,30 @@ function start(){
   roll();
 }
 function roll(){
-  let R, tries = 0; do { R = fromCode(makeCode()); tries++; } while (G.used.has(R.letter) && tries < 40);
+  let R, tries = 0; const tw = cfg.twists && G.round > 0; do { R = fromCode(makeCode(tw)); tries++; } while ((G.used.has(R.letter) || (tw && R.twist.id === "none" && tries < 3)) && tries < 40);
   G.used.add(R.letter); G.R = R;
   const box = GN.stage(`<div class="wrap" style="width:100%">
     <div class="kicker">Round ${G.round + 1} of ${cfg.rounds}</div>
     <div class="letter spin" id="L">?</div>
     <div id="after" style="opacity:0;transition:.3s">
+      ${R.letter2 ? `<div class="display" style="font-size:40px">and ${R.letter2}</div>` : ""}${twistHTML(R)}
       <p class="muted" style="margin:0">Code for other phones</p><div class="code">${pretty(R.code)}</div>
-      <div class="btns"><button class="btn primary big" id="go">Show the list & start ${GN.fmtTime(cfg.time)}</button></div></div></div>`);
+      <div class="btns"><button class="btn primary big" id="go">Show the list & start ${GN.fmtTime(roundTime(R))}</button></div></div></div>`);
   let n = 0; const L = GN.$("#L", box);
-  (function spin(){ if (!L.isConnected) return; if (n < 18) { L.textContent = ALL[Math.random() * 26 | 0]; GN.tone(400 + Math.random() * 400, .03, "triangle", .05); n++; setTimeout(spin, 40 + n * n * .7); }
-    else { L.textContent = R.letter; L.classList.remove("spin"); GN.sfx.good(); GN.$("#after").style.opacity = 1; } })();
+  (function spin(){ if (!L.isConnected) return; if (n < (R.twist.id !== "none" ? 26 : 18)) { L.textContent = ALL[Math.random() * 26 | 0]; GN.tone(400 + Math.random() * 400, .03, "triangle", .05); n++; setTimeout(spin, 40 + n * n * .7); }
+    else { L.textContent = R.letter; L.classList.remove("spin"); R.twist.id !== "none" ? GN.sfx.win() : GN.sfx.good(); GN.$("#after").style.opacity = 1; } })();
   GN.$("#go").onclick = writing;
 }
 function writing(){
   const R = G.R; let T;
   GN.stage(`<div class="wrap" style="width:100%;text-align:left">
-    <div class="sticky row between"><span class="minilet">${R.letter}</span><span class="clock" id="clk" style="font-size:40px">${GN.fmtTime(cfg.time)}</span><button class="btn sm" id="pz">Pause</button></div>
-    <div class="tbar" style="margin-bottom:12px"><i id="bar"></i></div>
-    <ol class="clist">${R.cats.map(c => `<li>${GN.esc(c)}</li>`).join("")}</ol>
+    <div class="sticky row between"><span class="minilet"${R.letter2 ? ' style="width:auto;padding:0 10px;font-size:24px"' : ""}>${letterLabel(R)}</span><span class="clock" id="clk" style="font-size:40px">${GN.fmtTime(roundTime(R))}</span><button class="btn sm" id="pz">Pause</button></div>
+    <div class="tbar" style="margin-bottom:12px"><i id="bar"></i></div>${R.twist.id !== "none" ? `<div class="small" style="margin-bottom:10px"><b>${R.twist.name}</b>: ${R.twist.rule}</div>` : ""}
+    ${catList(R)}
     <p class="small muted center">Code ${pretty(R.code)}</p>
     <div class="btns"><button class="btn" id="done">Everyone's done, stop early</button></div></div>`);
-  T = GN.timer({ seconds:cfg.time, warn:10, onTick:l => { const c = GN.$("#clk"); if (!c) return; c.textContent = GN.fmtTime(l); c.classList.toggle("low", l <= 15); GN.$("#bar").style.width = (l / cfg.time * 100) + "%"; },
+  const secs = roundTime(R);
+  T = GN.timer({ seconds:secs, warn:10, onTick:l => { const c = GN.$("#clk"); if (!c) return; c.textContent = GN.fmtTime(l); c.classList.toggle("low", l <= 15); GN.$("#bar").style.width = (l / secs * 100) + "%"; },
     onEnd:() => { GN.sfx.buzz(); GN.vibe([300, 100, 300]); pensDown(); } });
   GN.$("#pz").onclick = () => { if (T.paused) { T.resume(); GN.$("#pz").textContent = "Pause"; } else { T.pause(); GN.$("#pz").textContent = "Resume"; } };
   GN.$("#done").onclick = () => { T.stop(); pensDown(); };
@@ -137,19 +158,20 @@ function pensDown(){
 }
 function scoreCat(ci, pts){
   const R = G.R, last = ci === R.cats.length - 1;
-  const roundTot = G.sides.map((_, si) => pts.reduce((a, row) => a + row[si], 0));
+  const roundTot = G.sides.map((_, si) => pts.reduce((a, row, i) => a + row[si] * catMult(R, i), 0));
+  const mult = catMult(R, ci), top = R.twist.id === "alli" ? 3 : 2;
   GN.stage(`<div class="wrap" style="width:100%;text-align:left">
-    <div class="row between"><span class="minilet">${R.letter}</span><span class="kicker">Category ${ci + 1} of ${R.cats.length}</span></div>
-    <div class="catname">${GN.esc(R.cats[ci])}</div>
-    <p class="small muted" style="margin:0 0 12px">Tap once for unique (1), twice for alliteration (2), a third time to clear.</p>
-    <div class="sidegrid">${G.sides.map((s, si) => `<button class="sidebtn" data-s="${si}" style="--sc:${s.color}" aria-pressed="${pts[ci][si] > 0}">${GN.esc(s.name)}<small>round: ${roundTot[si]}</small><span class="badge">${pts[ci][si] ? "+" + pts[ci][si] : ""}</span></button>`).join("")}</div>
+    <div class="row between"><span class="minilet"${R.letter2 ? ' style="width:auto;padding:0 10px;font-size:24px"' : ""}>${letterLabel(R)}</span><span class="kicker">Category ${ci + 1} of ${R.cats.length}</span></div>
+    <div class="catname">${GN.esc(R.cats[ci])}${mult > 1 ? ` <span style="color:var(--acc)">×${mult}</span>` : ""}</div>
+    <p class="small muted" style="margin:0 0 12px">Tap once for unique (1), again for alliteration (${top}), again to clear.${mult > 1 ? ` Everything here is doubled.` : ""}</p>
+    <div class="sidegrid">${G.sides.map((s, si) => `<button class="sidebtn" data-s="${si}" style="--sc:${s.color}" aria-pressed="${pts[ci][si] > 0}">${GN.esc(s.name)}<small>round: ${roundTot[si]}</small><span class="badge">${pts[ci][si] ? "+" + pts[ci][si] * mult : ""}</span></button>`).join("")}</div>
     <div class="btns two"><button class="btn" id="prev" ${ci ? "" : "disabled"}>← Back</button><button class="btn primary" id="next">${last ? "Round totals" : "Next →"}</button></div></div>`);
-  GN.$$("[data-s]").forEach(b => b.onclick = () => { const si = +b.dataset.s; pts[ci][si] = (pts[ci][si] + 1) % 3; GN.sfx.tap(); scoreCat(ci, pts); });
+  GN.$$("[data-s]").forEach(b => b.onclick = () => { const si = +b.dataset.s; pts[ci][si] = pts[ci][si] === 0 ? 1 : pts[ci][si] === 1 ? top : 0; GN.sfx.tap(); scoreCat(ci, pts); });
   GN.$("#prev").onclick = () => scoreCat(ci - 1, pts);
   GN.$("#next").onclick = () => last ? roundEnd(pts) : scoreCat(ci + 1, pts);
 }
 function roundEnd(pts){
-  const delta = G.sides.map((_, si) => pts.reduce((a, row) => a + row[si], 0));
+  const delta = G.sides.map((_, si) => pts.reduce((a, row, i) => a + row[si] * catMult(G.R, i), 0));
   delta.forEach((d, i) => G.scores[i] += d); G.round++;
   const last = G.round >= cfg.rounds;
   GN.stage(`<div class="wrap" style="width:100%"><div class="kicker">Round ${G.round} · letter ${G.R.letter}</div><h2 style="margin:6px 0 14px">Scores</h2>
