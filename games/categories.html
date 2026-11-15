@@ -31,20 +31,18 @@
 const app = GN.page({ title:"Categories", accent:"#7ae582", accentInk:"#062a10" });
 const CATS = (window.GN_DATA && GN_DATA.categories) || [];
 const EASY = "ABCDEFGHIJKLMNOPRSTW", ALL = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-const cfg = Object.assign({ count:12, time:180, rounds:3, hard:false, twists:true }, GN.get("categories.cfg", {}));
+const cfg = Object.assign({ count:12, time:180, rounds:3, hard:false, twists:false }, GN.get("categories.cfg", {}));
 const save = () => GN.set("categories.cfg", cfg);
 const CODECH = "ABCDEFGHJKMNPQRSTVWXYZ";
-let G = null;
+let G = null, OPTS = false;
 
 /* A round is fully determined by its code, so other phones can show the same list. */
 /* Twists keep later rounds fresh. Weighted so plain rounds still happen. */
 const TWISTS = [
   { id:"none", w:4 },
-  { id:"star", w:3, name:"⭐ Star category", rule:"One category is worth double. It's marked with a star." },
+  { id:"star", w:3, name:"⭐ Star category", rule:"The starred category is worth double." },
   { id:"two", w:2, name:"✌️ Two letters", rule:"Answers can start with either letter." },
   { id:"speed", w:2, name:"⚡ Speed round", rule:"Half the time, but every point counts double." },
-  { id:"end", w:1, name:"🔚 Ends with", rule:"Answers must END with the letter, not start with it." },
-  { id:"alli", w:2, name:"🎯 Alliteration bonus", rule:"Two-word answers where both words start with the letter score 3." },
 ];
 function makeCode(twist){ return Array.from({ length:4 }, () => GN.pick(CODECH.split(""))).join("") + String(cfg.count).padStart(2, "0") + (cfg.hard ? "H" : "") + (twist ? "T" : ""); }
 function fromCode(code){
@@ -70,33 +68,25 @@ const pretty = c => c.slice(0, 4) + "·" + c.slice(4);
 function setup(){
   GN.render(`<div class="stack">
     <div><div class="kicker">Wordplay · pens & paper</div><h1>Categories</h1>
-    <p class="lede">One letter, a list of categories, and a ticking clock. Write an answer for each one that starts with the letter. Only answers nobody else wrote will score.</p></div>
+    <p class="lede">One letter, a list of categories, a ticking clock. Think of answers nobody else will.</p></div>
     <div id="roster"></div>
-    <div class="card">
-      <h3>Settings</h3>
-      <div class="setting"><div class="lab">Categories per round</div>${GN.seg("count", [8, 10, 12, 15], cfg.count)}</div>
+    <button class="btn primary big block" id="go">Roll the first letter</button>
+    <div class="card rules"><h3>How to play</h3><ul>
+      <li>Grab paper and a pen${GN.isPairs() ? " (one list per team)" : ""}.</li>
+      <li>Write one answer per category, starting with the letter.</li>
+      <li>When time's up, read your answers out.</li>
+      <li>1 point for each answer nobody else wrote.</li></ul></div>
+    <details class="card" id="opts" ${OPTS ? "open" : ""}><summary>⚙️ Options</summary>
+      <div class="setting" style="margin-top:10px"><div class="lab">Categories per round</div>${GN.seg("count", [8, 10, 12, 15], cfg.count)}</div>
       <div class="setting"><div class="lab">Time to write</div>${GN.seg("time", [120, 180, 240], cfg.time, v => v / 60 + " min")}</div>
       <div class="setting"><div class="lab">Rounds</div>${GN.seg("rounds", [1, 2, 3, 4], cfg.rounds)}</div>
-      <div class="setting"><div class="lab">Hard letters<small>Allow Q, U, V, X, Y, Z</small></div>${GN.seg("hard", [false, true], cfg.hard, v => v ? "On" : "Off")}</div>
-      <div class="setting"><div class="lab">Twist rounds<small>From round 2: star categories, two letters, speed rounds, "ends with" and more.</small></div>${GN.seg("twists", [true, false], cfg.twists, v => v ? "On" : "Off")}</div>
-    </div>
-    <div class="note">📝 Each ${GN.isPairs() ? "team" : "player"} needs paper and a pen, or a notes app. Number your lines 1 to ${cfg.count}. ${GN.isPairs() ? "Partners write one shared list." : ""}</div>
-    <button class="btn primary big block" id="go">Roll the first letter</button>
-    <div class="card">
-      <h3>Following on another phone?</h3>
-      <p class="small muted" style="margin:0 0 10px">Every round has a code. Enter it to see the same letter and list on your own phone. (${CATS.length} categories in the pool.)</p>
-      <div class="row"><input class="input grow" id="jc" placeholder="e.g. KQPT·12" maxlength="9" autocomplete="off" autocapitalize="characters" style="width:auto"><button class="btn" id="join">Join</button></div>
-    </div>
-    <details class="card rules"><summary>Rules & scoring</summary>
-      <ol>
-        <li>Roll a letter. Everyone writes one answer per category, starting with that letter, before time runs out.</li>
-        <li>Then go through the list one category at a time. Each side reads its answer out loud.</li>
-        <li><b>1 point</b> for a valid answer that no other side wrote. Matching answers cancel each other out.</li>
-        <li><b>2 points</b> for alliteration, where most of the words start with the letter ("Bob's Burgers" for B). Tap a side twice to give it 2.</li>
-        <li>The group rules on anything sketchy. Majority wins, and leaning on puns is allowed.</li>
-      </ol>
+      <div class="setting"><div class="lab">Hard letters<small>Q, U, V, X, Y, Z</small></div>${GN.seg("hard", [false, true], cfg.hard, v => v ? "On" : "Off")}</div>
+      <div class="setting"><div class="lab">Twist rounds<small>Star category, two letters, speed round</small></div>${GN.seg("twists", [false, true], cfg.twists, v => v ? "On" : "Off")}</div>
+      <div class="setting" style="display:block"><div class="lab" style="margin-bottom:8px">Join from another phone<small>Type the round code to see the same list.</small></div>
+        <div class="row"><input class="input grow" id="jc" placeholder="e.g. KQPT·12" maxlength="10" autocomplete="off" autocapitalize="characters" style="width:auto"><button class="btn" id="join">Join</button></div></div>
     </details>
   </div>`);
+  GN.$("#opts").ontoggle = e => OPTS = e.target.open;
   GN.rosterBlock(GN.$("#roster"));
   GN.bindSegs(app, cfg, () => { save(); setup(); });
   GN.$("#go").onclick = start;
@@ -152,21 +142,21 @@ function writing(){
 }
 function pensDown(){
   GN.stage(`<div class="wrap" style="width:100%"><div style="font-size:70px">✋</div><h1 style="font-size:52px">Pens down!</h1>
-    <p class="lede" style="margin:12px auto">Now go through it one category at a time. Read your answers out loud, then tap each side whose answer scores.</p>
+    <p class="lede" style="margin:12px auto">Go category by category. Read answers out, tap the unique ones.</p>
     <div class="btns"><button class="btn primary big" id="go">Start scoring</button></div></div>`);
   GN.$("#go").onclick = () => scoreCat(0, G.R.cats.map(() => G.sides.map(() => 0)));
 }
 function scoreCat(ci, pts){
   const R = G.R, last = ci === R.cats.length - 1;
   const roundTot = G.sides.map((_, si) => pts.reduce((a, row, i) => a + row[si] * catMult(R, i), 0));
-  const mult = catMult(R, ci), top = R.twist.id === "alli" ? 3 : 2;
+  const mult = catMult(R, ci);
   GN.stage(`<div class="wrap" style="width:100%;text-align:left">
     <div class="row between"><span class="minilet"${R.letter2 ? ' style="width:auto;padding:0 10px;font-size:24px"' : ""}>${letterLabel(R)}</span><span class="kicker">Category ${ci + 1} of ${R.cats.length}</span></div>
     <div class="catname">${GN.esc(R.cats[ci])}${mult > 1 ? ` <span style="color:var(--acc)">×${mult}</span>` : ""}</div>
-    <p class="small muted" style="margin:0 0 12px">Tap once for unique (1), again for alliteration (${top}), again to clear.${mult > 1 ? ` Everything here is doubled.` : ""}</p>
+    <p class="small muted" style="margin:0 0 12px">Tap everyone whose answer was unique.${mult > 1 ? ` Worth double!` : ""}</p>
     <div class="sidegrid">${G.sides.map((s, si) => `<button class="sidebtn" data-s="${si}" style="--sc:${s.color}" aria-pressed="${pts[ci][si] > 0}">${GN.esc(s.name)}<small>round: ${roundTot[si]}</small><span class="badge">${pts[ci][si] ? "+" + pts[ci][si] * mult : ""}</span></button>`).join("")}</div>
     <div class="btns two"><button class="btn" id="prev" ${ci ? "" : "disabled"}>← Back</button><button class="btn primary" id="next">${last ? "Round totals" : "Next →"}</button></div></div>`);
-  GN.$$("[data-s]").forEach(b => b.onclick = () => { const si = +b.dataset.s; pts[ci][si] = pts[ci][si] === 0 ? 1 : pts[ci][si] === 1 ? top : 0; GN.sfx.tap(); scoreCat(ci, pts); });
+  GN.$$("[data-s]").forEach(b => b.onclick = () => { const si = +b.dataset.s; pts[ci][si] = pts[ci][si] ? 0 : 1; GN.sfx.tap(); scoreCat(ci, pts); });
   GN.$("#prev").onclick = () => scoreCat(ci - 1, pts);
   GN.$("#next").onclick = () => last ? roundEnd(pts) : scoreCat(ci + 1, pts);
 }

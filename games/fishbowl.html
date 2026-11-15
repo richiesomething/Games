@@ -29,46 +29,39 @@
 const app = GN.page({ title:"Fishbowl", accent:"#4cc9f0", accentInk:"#032634" });
 const DECKS = (window.GN_DATA && GN_DATA.decks || []).filter(d => d.cards && d.cards.length);
 const ROUNDS = [
-  { n:"Describe it", e:"🗣️", r:"Say anything except the name itself. No spelling it out, no “sounds like”, no first letters." },
-  { n:"One word", e:"☝️", r:"Exactly one word per card. You can repeat it, point and make faces, but say nothing else." },
-  { n:"Charades", e:"🎭", r:"No words and no sounds. Act it out. Everyone has seen these cards twice now, so you can lean on the jokes." },
-  { n:"Sounds only", e:"🎵", r:"Bonus round. Make noises, hum or beatbox, but no real words. Stand still with your hands behind your back." },
+  { n:"Describe it", e:"🗣️", r:"Say anything except the name itself." },
+  { n:"One word", e:"☝️", r:"Just one word per card." },
+  { n:"Charades", e:"🎭", r:"No talking. Act it out." },
+  { n:"Sounds only", e:"🎵", r:"Noises only. No words, no moving." },
 ];
-const cfg = Object.assign({ source:"write", per:4, len:60, fourth:false, passes:1, decks:DECKS.filter(d => d.q20).map(d => d.id) }, GN.get("fishbowl.cfg", {}));
+const cfg = Object.assign({ source:"mix", per:4, len:60, fourth:false, passes:1, decks:DECKS.filter(d => d.q20).map(d => d.id) }, GN.get("fishbowl.cfg", {}));
 const save = () => GN.set("fishbowl.cfg", cfg);
-let G = null;
+let G = null, OPTS = false;
 
 function setup(){
   const n = GN.roster().players.length;
   GN.render(`<div class="stack">
     <div><div class="kicker">Teams · three rounds · loud</div><h1>Fishbowl</h1>
-    <p class="lede">Everyone adds names to the bowl. In round one you describe them. In round two you get one word. In round three it's charades. By then everyone knows the cards and has the inside jokes to work with.</p></div>
+    <p class="lede">One pile of names, three rounds. The same cards get funnier every round.</p></div>
     <div id="roster"></div>
-    <div class="card">
-      <h3>The bowl</h3>
-      <div class="setting"><div class="lab">Where the cards come from<small id="srcHint"></small></div>${GN.seg("source", ["write", "mix", "decks"], cfg.source, v => ({ write:"We write them", mix:"Half & half", decks:"Draw from decks" })[v])}</div>
-      <div class="setting"><div class="lab">Cards per player<small>${n} players × ${cfg.per} = ${n * cfg.per} cards</small></div>${GN.seg("per", [3, 4, 5, 6], cfg.per)}</div>
-      <div id="deckpick" ${cfg.source === "write" ? "hidden" : ""}><div class="setting" style="display:block"><div class="lab" style="margin-bottom:8px">Decks to draw from</div><div class="decks">${DECKS.map(d => `<button class="chip" data-d="${d.id}" aria-pressed="${cfg.decks.includes(d.id)}">${d.emoji} ${GN.esc(d.name)}</button>`).join("")}</div></div></div>
-    </div>
-    <div class="card">
-      <h3>Turns</h3>
-      <div class="setting"><div class="lab">Turn length</div>${GN.seg("len", [45, 60, 75], cfg.len, v => v + "s")}</div>
-      <div class="setting"><div class="lab">Passes per turn<small>A passed card goes back in the bowl.</small></div>${GN.seg("passes", [0, 1, 2], cfg.passes)}</div>
-      <div class="setting"><div class="lab">Bonus 4th round<small>Sounds only. No words, no gestures.</small></div>${GN.seg("fourth", [false, true], cfg.fourth, v => v ? "On" : "Off")}</div>
-    </div>
-    <div class="grid" style="display:grid;gap:8px">${ROUNDS.slice(0, cfg.fourth ? 4 : 3).map((r, i) => `<div class="roundcard"><div class="row"><span class="num">${i + 1}</span><b>${r.e} ${r.n}</b></div><div class="small muted" style="margin-top:4px">${r.r}</div></div>`).join("")}</div>
     <button class="btn primary big block" id="go">Fill the bowl</button>
-    <details class="card rules"><summary>Rules & tips</summary>
-      <p><b>Teams of 2.</b> Partners take turns. One gives clues, the other guesses, and you swap each turn. Teams alternate.</p>
-      <p><b>Individuals.</b> The clue-giver describes and anyone can shout. Tap whoever guessed it: <b>they get a point and so does the clue-giver.</b></p>
-      <p><b>The bowl.</b> When the bowl runs out, the round is over. All cards go back in for the next round. If you empty the bowl with time left, you start the next round with what's left of your clock.</p>
-      <p><b>Writing cards.</b> Famous people, characters, places or things, and in-jokes from your group. Make them something most people in the room would know.</p>
+    <div class="card rules"><h3>How to play</h3><ul>
+      <li>Everyone secretly adds a few names to the bowl.</li>
+      ${ROUNDS.slice(0, cfg.fourth ? 4 : 3).map((r, i) => `<li><b>Round ${i + 1}, ${r.e} ${r.n}:</b> ${r.r}</li>`).join("")}
+      <li>${GN.isPairs() ? "Your partner guesses." : "Anyone can guess. Tap who got it."} One point per card.</li></ul></div>
+    <details class="card" id="opts" ${OPTS ? "open" : ""}><summary>⚙️ Options</summary>
+      <div class="setting" style="margin-top:10px"><div class="lab">Where cards come from</div>${GN.seg("source", ["write", "mix", "decks"], cfg.source, v => ({ write:"We write", mix:"Half & half", decks:"All from decks" })[v])}</div>
+      <div class="setting"><div class="lab">Cards per player<small>${n * cfg.per} cards total</small></div>${GN.seg("per", [3, 4, 5, 6], cfg.per)}</div>
+      <div class="setting"><div class="lab">Turn length</div>${GN.seg("len", [45, 60, 75], cfg.len, v => v + "s")}</div>
+      <div class="setting"><div class="lab">Passes per turn</div>${GN.seg("passes", [0, 1, 2], cfg.passes)}</div>
+      <div class="setting"><div class="lab">Bonus 4th round<small>Sounds only</small></div>${GN.seg("fourth", [false, true], cfg.fourth, v => v ? "On" : "Off")}</div>
+      <div id="deckpick" ${cfg.source === "write" ? "hidden" : ""}><div class="setting" style="display:block"><div class="lab" style="margin-bottom:8px">Decks to draw from</div><div class="decks">${DECKS.map(d => `<button class="chip" data-d="${d.id}" aria-pressed="${cfg.decks.includes(d.id)}">${d.emoji} ${GN.esc(d.name)}</button>`).join("")}</div></div></div>
     </details>
   </div>`);
+  GN.$("#opts").ontoggle = e => OPTS = e.target.open;
   GN.rosterBlock(GN.$("#roster"), { onChange:setup });
   GN.bindSegs(app, cfg, () => { save(); setup(); });
   GN.$$("[data-d]").forEach(b => b.onclick = () => { const id = b.dataset.d; cfg.decks = cfg.decks.includes(id) ? cfg.decks.filter(x => x !== id) : [...cfg.decks, id]; if (!cfg.decks.length) cfg.decks = [id]; save(); b.setAttribute("aria-pressed", cfg.decks.includes(id)); });
-  GN.$("#srcHint").textContent = { write:"Everyone secretly types their cards on this phone.", mix:"Everyone writes half; the rest are drawn from decks.", decks:"Skip the writing and start right away." }[cfg.source];
   GN.$("#go").onclick = start;
 }
 
@@ -88,7 +81,7 @@ function start(){
 function collect(pi, k){
   if (pi >= G.players.length) return beginRound();
   const p = G.players[pi];
-  GN.handoff({ to:p, emoji:"✍️", color:GN.color(pi), msg:`Secretly write ${k} card${k > 1 ? "s" : ""} for the bowl. Pick names most of the room will know.`, button:"Write my cards", onReady:() => {
+  GN.handoff({ to:p, emoji:"✍️", color:GN.color(pi), msg:`Secretly add ${k} name${k > 1 ? "s" : ""} everyone will know.`, button:"Write my cards", onReady:() => {
     const sugg = GN.shuffle(DECKS.filter(d => d.q20).flatMap(d => d.cards.map(c => c[0]))).slice(0, 3);
     const el = GN.stage(`<div class="wrap" style="width:100%;text-align:left">
       <div class="kicker">${GN.esc(p)} · secret</div><h2 style="margin:6px 0 12px">Your cards for the bowl</h2>

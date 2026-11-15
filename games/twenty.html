@@ -14,13 +14,11 @@
 .dots{display:grid;grid-template-columns:repeat(20,1fr);gap:3px;margin:12px 0}
 .dots i{height:9px;border-radius:5px;background:var(--line)}
 .dots i.q{background:var(--acc)} .dots i.g{background:var(--bad)} .dots i.h{background:var(--info)}
-.dots i.zone{box-shadow:inset 0 -3px 0 var(--good)}
 .peekbox{min-height:190px;display:flex;align-items:center;justify-content:center;cursor:pointer}
 .peekbox .sec{display:none}
 .peekbox.on .sec{display:block} .peekbox.on .cover{display:none}
 .decks{display:flex;flex-wrap:wrap;gap:6px}
 .asker{display:inline-flex;align-items:center;gap:8px;font-weight:800}
-.hintline{font-family:var(--display);font-size:28px;letter-spacing:.2em}
 </style>
 </head>
 <body>
@@ -36,45 +34,31 @@ const cfg = Object.assign({ secret:"deal", showCat:true, rounds:1, decks:DECKS.m
 cfg.decks = cfg.decks.filter(id => DECKS.some(d => d.id === id)); if (!cfg.decks.length) cfg.decks = DECKS.map(d => d.id);
 const save = () => GN.set("twenty.cfg", cfg);
 const SOLVE = q => q <= 5 ? 5 : q <= 10 ? 4 : q <= 15 ? 3 : 2;
-const SWEET = [8, 16];
-let G = null;
+let G = null, OPTS = false;
 
 function setup(){
   GN.render(`<div class="stack">
     <div><div class="kicker">Deduction · hot seat</div><h1>Twenty<br>Questions</h1>
-    <p class="lede">One side holds a secret. Everyone else takes turns asking yes-or-no questions. Solve it early for big points. The answerer wants it solved, but not too fast.</p></div>
+    <p class="lede">One side holds a secret. Everyone else asks yes-or-no questions to crack it.</p></div>
     <div id="roster"></div>
-    <div class="card">
-      <h3>Secrets</h3>
-      <div class="setting"><div class="lab">Where secrets come from<small id="sh"></small></div>${GN.seg("secret", ["deal", "think"], cfg.secret, v => v === "deal" ? "Deal a card" : "Think of one")}</div>
-      <div class="setting"><div class="lab">Show the category<small>Tell guessers it's a person, place, animal or thing up front. Makes it friendlier.</small></div>${GN.seg("showCat", [true, false], cfg.showCat, v => v ? "Show" : "Hide")}</div>
-      <div class="setting"><div class="lab">Turns in the hot seat<small>How many times each side answers.</small></div>${GN.seg("rounds", [1, 2, 3], cfg.rounds)}</div>
-      <div id="dk" ${cfg.secret === "deal" ? "" : "hidden"}><div class="setting" style="display:block"><div class="lab" style="margin-bottom:8px">Decks</div><div class="decks">${DECKS.map(d => `<button class="chip" data-d="${d.id}" aria-pressed="${cfg.decks.includes(d.id)}">${d.emoji} ${GN.esc(d.name)}</button>`).join("")}</div></div></div>
-    </div>
-    <div class="card"><h3>Scoring</h3>
-      <div class="board">
-        <div class="srow" style="--sc:var(--acc)"><div class="nm">Solve in questions 1–5</div><span class="pts">5</span></div>
-        <div class="srow" style="--sc:var(--acc)"><div class="nm">Questions 6–10</div><span class="pts">4</span></div>
-        <div class="srow" style="--sc:var(--acc)"><div class="nm">Questions 11–15</div><span class="pts">3</span></div>
-        <div class="srow" style="--sc:var(--acc)"><div class="nm">Questions 16–20</div><span class="pts">2</span></div>
-        <div class="srow" style="--sc:var(--good)"><div class="nm">Answerer, if it's solved in Q8–16 (the sweet spot)<div class="sub">Rewards clear, honest answers</div></div><span class="pts">3</span></div>
-        <div class="srow" style="--sc:var(--s4)"><div class="nm">Answerer, if nobody gets it<div class="sub">Dealt cards only</div></div><span class="pts">2</span></div>
-      </div></div>
     <button class="btn primary big block" id="go">Start</button>
-    <details class="card rules"><summary>Rules</summary>
-      <ol>
-        <li>The answerer (or answering pair) secretly looks at the card. Partners can whisper to agree on tricky answers.</li>
-        <li>The other sides take turns asking one yes-or-no question each. The app shows whose turn it is to ask. Answers are <b>Yes</b>, <b>No</b>, <b>Sort of</b> or <b>Doesn't apply</b>.</li>
-        <li>On your turn you can make a guess instead of asking. A wrong guess still uses up a question.</li>
-        <li>After question 10 the answerer may give a <b>first-letter hint</b>. It costs whoever solves it 1 point.</li>
-        <li>Solve it and you score by how early you got it. After 20 questions with no answer, the secret is revealed.</li>
-      </ol>
+    <div class="card rules"><h3>How to play</h3><ul>
+      <li>One ${GN.isPairs() ? "team" : "player"} secretly sees a person, place or thing.</li>
+      <li>Everyone else takes turns asking one yes-or-no question.</li>
+      <li>On your turn you can guess instead. A wrong guess uses up a question.</li>
+      <li>Solve it sooner, score more: <b>5</b> points early, down to <b>2</b> near the end.</li></ul></div>
+    <details class="card" id="opts" ${OPTS ? "open" : ""}><summary>⚙️ Options</summary>
+      <div class="setting" style="margin-top:10px"><div class="lab">Secrets<small id="sh"></small></div>${GN.seg("secret", ["deal", "think"], cfg.secret, v => v === "deal" ? "Deal a card" : "Think of one")}</div>
+      <div class="setting"><div class="lab">Show the category</div>${GN.seg("showCat", [true, false], cfg.showCat, v => v ? "Show" : "Hide")}</div>
+      <div class="setting"><div class="lab">Turns in the hot seat</div>${GN.seg("rounds", [1, 2, 3], cfg.rounds)}</div>
+      <div id="dk" ${cfg.secret === "deal" ? "" : "hidden"}><div class="setting" style="display:block"><div class="lab" style="margin-bottom:8px">Decks</div><div class="decks">${DECKS.map(d => `<button class="chip" data-d="${d.id}" aria-pressed="${cfg.decks.includes(d.id)}">${d.emoji} ${GN.esc(d.name)}</button>`).join("")}</div></div></div>
     </details>
   </div>`);
-  GN.rosterBlock(GN.$("#roster"), { minSides:3, note:"Works best with 3+ sides: one answers, the rest compete to solve." });
+  GN.$("#opts").ontoggle = e => OPTS = e.target.open;
+  GN.rosterBlock(GN.$("#roster"), { minSides:3 });
   GN.bindSegs(app, cfg, () => { save(); setup(); });
   GN.$$("[data-d]").forEach(b => b.onclick = () => { const id = b.dataset.d; cfg.decks = cfg.decks.includes(id) ? cfg.decks.filter(x => x !== id) : [...cfg.decks, id]; if (!cfg.decks.length) cfg.decks = [id]; save(); b.setAttribute("aria-pressed", cfg.decks.includes(id)); });
-  GN.$("#sh").textContent = cfg.secret === "deal" ? "The phone deals a person, place or thing. Up to 2 rerolls if it's too obscure." : "The answerer picks anything they like and types it in secretly.";
+  GN.$("#sh").textContent = cfg.secret === "deal" ? "The phone picks one." : "The answerer makes one up.";
   GN.$("#go").onclick = start;
 }
 
@@ -115,7 +99,7 @@ function thinkSecret(ai){
   GN.$("#ok").onclick = () => board(ai, { w:GN.$("#sw").value.trim(), cat, emoji:"💭", dealt:false });
 }
 function board(ai, secret){
-  const R = { ai, secret, log:[], hint:false, askers:G.sides.map((_, i) => i).filter(i => i !== ai) };
+  const R = { ai, secret, log:[], askers:G.sides.map((_, i) => i).filter(i => i !== ai) };
   R.ask = G.askIdx % R.askers.length;
   const draw = () => {
     const q = R.log.length, next = q + 1, asker = G.sides[R.askers[R.ask % R.askers.length]];
@@ -123,18 +107,14 @@ function board(ai, secret){
       <div class="row between"><span class="kicker">${GN.esc(G.sides[ai].name)} is answering</span><button class="iconbtn" data-sound>${GN.soundOn() ? "🔊" : "🔇"}</button></div>
       ${cfg.showCat || !secret.dealt ? `<div class="pill" style="display:inline-block;margin-top:10px;font-size:15px">${secret.emoji} It's from: <b style="color:var(--ink)">${GN.esc(secret.cat)}</b></div>` : ""}
       <div class="qnum" style="margin-top:12px">${Math.min(next, 20)}</div><div class="muted" style="font-weight:700">${q >= 20 ? "Out of questions" : "question of 20 · worth " + SOLVE(next) + " if solved now"}</div>
-      <div class="dots">${Array.from({ length:20 }, (_, i) => `<i class="${R.log[i] ? R.log[i] : ""}${i + 1 >= SWEET[0] && i + 1 <= SWEET[1] ? " zone" : ""}"></i>`).join("")}</div>
-      <div class="small muted" style="margin-bottom:6px">Green underline = answerer's sweet spot</div>
-      ${R.hint ? `<div class="hintline">${GN.esc((secret.w || "?").replace(/[A-Za-z0-9]/g, (ch, i) => i === 0 ? ch.toUpperCase() : "_"))}</div>` : ""}
+      <div class="dots">${Array.from({ length:20 }, (_, i) => `<i class="${R.log[i] ? R.log[i] : ""}"></i>`).join("")}</div>
       ${q < 20 ? `<div class="card" style="margin-top:10px"><div class="small muted">Next to ask</div><div style="margin-top:6px">${GN.sidePill(asker)}</div>
         <div class="btns two"><button class="btn primary" id="asked">Asked ✓</button><button class="btn" id="wrong">Wrong guess ✗</button></div></div>` : ""}
       <div class="btns two"><button class="btn good" id="solved">Solved! 🎉</button><button class="btn" id="stump">${q >= 20 ? "Reveal" : "Give up"}</button></div>
-      <div class="row" style="justify-content:center;margin-top:12px"><button class="btn sm ghost" id="undo" ${q ? "" : "disabled"}>↩ Undo</button>
-        ${!R.hint && secret.w && q >= 10 ? `<button class="btn sm ghost" id="hint">💡 First-letter hint (−1)</button>` : ""}</div></div>`);
+      <div class="row" style="justify-content:center;margin-top:12px"><button class="btn sm ghost" id="undo" ${q ? "" : "disabled"}>↩ Undo</button></div></div>`);
     const step = kind => { if (R.log.length >= 20) return; R.log.push(kind); R.ask++; kind === "g" ? GN.sfx.bad() : GN.sfx.tap(); draw(); };
     if (GN.$("#asked")) { GN.$("#asked").onclick = () => step("q"); GN.$("#wrong").onclick = () => step("g"); }
     GN.$("#undo").onclick = () => { R.log.pop(); R.ask = Math.max(0, R.ask - 1); draw(); };
-    if (GN.$("#hint")) GN.$("#hint").onclick = () => { R.hint = true; GN.sfx.ding(); draw(); };
     GN.$("#solved").onclick = () => pickSolver(R, draw);
     GN.$("#stump").onclick = () => reveal(R, null);
   };
@@ -153,13 +133,11 @@ function pickSolver(R, back){
 function reveal(R, solver){
   const q = Math.min(R.log.length + 1, 20), delta = G.sides.map(() => 0); let line;
   if (solver != null) {
-    delta[solver] = Math.max(1, SOLVE(q) - (R.hint ? 1 : 0));
-    if (q >= SWEET[0] && q <= SWEET[1]) delta[R.ai] = 3;
-    line = `${GN.esc(G.sides[solver].name)} solved it on question ${q}.` + (delta[R.ai] ? ` Sweet spot! ${GN.esc(G.sides[R.ai].name)} gets 3.` : q < SWEET[0] ? " That was quick, so no answerer bonus." : "");
+    delta[solver] = SOLVE(q);
+    line = `${GN.esc(G.sides[solver].name)} solved it on question ${q} for ${delta[solver]} points.`;
     GN.sfx.win(); GN.confetti();
   } else {
-    if (R.secret.dealt) delta[R.ai] = 2;
-    line = "Nobody got it." + (delta[R.ai] ? ` ${GN.esc(G.sides[R.ai].name)} takes 2 for the stump.` : "");
+    line = "Nobody got it this time.";
     GN.sfx.buzz();
   }
   delta.forEach((d, i) => G.scores[i] += d);

@@ -53,7 +53,9 @@
 <script>
 const app = GN.page({ title:"Forehead", accent:"#ff6b8b", accentInk:"#2a0510" });
 const DECKS = (window.GN_DATA && GN_DATA.decks || []).filter(d => d.cards && d.cards.length);
-const cfg = Object.assign({ decks:DECKS.map(d => d.id), mode:"forehead", len:60, taboo:false, rounds:2, passes:0, golden:true, finale:true }, GN.get("forehead.cfg", {}));
+const cfg = Object.assign({ decks:DECKS.map(d => d.id), known:DECKS.map(d => d.id), mode:"forehead", len:60, taboo:false, rounds:2, passes:0, golden:true, finale:false }, GN.get("forehead.cfg", {}));
+// decks added since this device last played are switched on automatically
+const known = new Set(cfg.known || []); DECKS.forEach(d => { if (!known.has(d.id) && !cfg.decks.includes(d.id)) cfg.decks.push(d.id); }); cfg.known = DECKS.map(d => d.id);
 cfg.decks = cfg.decks.filter(id => DECKS.some(d => d.id === id)); if (!cfg.decks.length) cfg.decks = DECKS.map(d => d.id);
 const save = () => GN.set("forehead.cfg", cfg);
 let G = null; // game state
@@ -62,30 +64,24 @@ function setup(){
   GN.render(`
   <div class="stack">
     <div><div class="kicker">Clue-giving · fast</div><h1 style="font-size:clamp(40px,12vw,58px)">Forehead</h1>
-    <p class="lede">The guesser can't see the card. Everyone else can. Shout clues, act it out, and get through as many as you can before the clock runs out.</p></div>
+    <p class="lede">You can't see your card. Your friends shout clues. Guess as many as you can.</p></div>
     <div id="roster"></div>
-    <div class="card">
-      <h3>How you'll play</h3>
-      <div class="setting"><div class="lab">Who holds the phone<small id="modeHint"></small></div>${GN.seg("mode", ["forehead", "clue"], cfg.mode, v => v === "forehead" ? "Guesser 🤳" : "Clue-giver 🗣️")}</div>
-      <div class="setting"><div class="lab">Forbidden words<small>Taboo-style. Say one of the four listed words and the card costs a point.</small></div>${GN.seg("taboo", [false, true], cfg.taboo, v => v ? "On" : "Off")}</div>
-      <div class="setting"><div class="lab">Turn length</div>${GN.seg("len", [45, 60, 90], cfg.len, v => v + "s")}</div>
-      <div class="setting"><div class="lab">Turns per ${GN.isPairs() ? "player" : "player"}<small id="turnHint"></small></div>${GN.seg("rounds", [1, 2, 3], cfg.rounds)}</div>
-      <div class="setting"><div class="lab">Passes per turn</div>${GN.seg("passes", [0, 3, 5], cfg.passes, v => v ? v : "∞")}</div>
-      <div class="setting"><div class="lab">⭐ Golden cards<small>About 1 in 8 cards is golden and worth double.</small></div>${GN.seg("golden", [true, false], cfg.golden, v => v ? "On" : "Off")}</div>
-      <div class="setting"><div class="lab">🔥 Double-points finale<small>Everything in the last lap of turns counts twice. Comebacks happen.</small></div>${GN.seg("finale", [true, false], cfg.finale, v => v ? "On" : "Off")}</div>
-    </div>
-    <div class="card">
-      <div class="row between"><h3 style="margin:0">Decks</h3><span class="row"><button class="link small" id="all">All</button><button class="link small" id="none">None</button></span></div>
-      <p class="small muted" style="margin:4px 0 12px" id="deckCount"></p>
-      <div class="decks" id="decks"></div>
-    </div>
     <button class="btn primary big block" id="go">Start the game</button>
-    <details class="card rules"><summary>Rules</summary>
-      <p><b>Guesser mode (classic).</b> Hold the phone sideways on your forehead, screen facing out. Your team clues you. <b>Tilt down</b> for correct and <b>tilt up</b> to pass. If tilting doesn't work on your phone, tap the right half for correct and the left half to pass.</p>
-      <p><b>Clue-giver mode.</b> The clue-giver holds the phone and describes. Tap <b>Got it</b>, <b>Pass</b>, or <b>Buzz</b> if a forbidden word slipped out.</p>
-      <p><b>Teams of 2.</b> One partner guesses and the other gives clues, then you swap next turn. Everyone else watches, and polices forbidden words if they're on.</p>
-      <p><b>Individuals.</b> Each player takes a turn guessing (or clue-giving) and everyone else helps. Your score is the cards you get through.</p>
-      <p><b>Scoring.</b> +1 per correct card, −1 per buzz. After each turn you can tap any word to fix a mistake.</p>
+    <div class="card rules"><h3>How to play</h3><ul>
+      <li>Hold the phone sideways on your forehead, screen facing out.</li>
+      <li>Everyone else gives clues. ${GN.isPairs() ? "In teams, your partner gives the clues." : ""}</li>
+      <li><b>Tilt down</b> if you got it, <b>tilt up</b> to pass. (Or tap right / left.)</li>
+      <li>One point per card. ⭐ Gold cards are worth two.</li></ul></div>
+    <details class="card"><summary>⚙️ Options</summary>
+      <div class="setting" style="margin-top:10px"><div class="lab">Who holds the phone<small id="modeHint"></small></div>${GN.seg("mode", ["forehead", "clue"], cfg.mode, v => v === "forehead" ? "Guesser 🤳" : "Clue-giver 🗣️")}</div>
+      <div class="setting"><div class="lab">Forbidden words<small>Say a listed word and lose a point.</small></div>${GN.seg("taboo", [false, true], cfg.taboo, v => v ? "On" : "Off")}</div>
+      <div class="setting"><div class="lab">Turn length</div>${GN.seg("len", [45, 60, 90], cfg.len, v => v + "s")}</div>
+      <div class="setting"><div class="lab">Turns each<small id="turnHint"></small></div>${GN.seg("rounds", [1, 2, 3], cfg.rounds)}</div>
+      <div class="setting"><div class="lab">Passes per turn</div>${GN.seg("passes", [0, 3, 5], cfg.passes, v => v ? v : "∞")}</div>
+      <div class="setting"><div class="lab">⭐ Gold cards</div>${GN.seg("golden", [true, false], cfg.golden, v => v ? "On" : "Off")}</div>
+      <div class="setting"><div class="lab">🔥 Double-points last lap</div>${GN.seg("finale", [false, true], cfg.finale, v => v ? "On" : "Off")}</div>
+      <div class="setting" style="display:block"><div class="row between"><div class="lab">Decks <small id="deckCount" style="display:inline"></small></div><span class="row"><button class="link small" id="all">All</button><button class="link small" id="none">None</button></span></div>
+        <div class="decks" id="decks" style="margin-top:10px"></div></div>
     </details>
   </div>`);
   GN.rosterBlock(GN.$("#roster"), { onChange:hints });
@@ -97,16 +93,16 @@ function setup(){
 }
 function hints(){
   const pairs = GN.isPairs();
-  GN.$("#modeHint").textContent = cfg.mode === "forehead" ? "Phone on the guesser's forehead; everyone else gives clues." : "Clue-giver holds the phone and describes; " + (pairs ? "their partner guesses." : "anyone can guess.");
+  GN.$("#modeHint").textContent = cfg.mode === "forehead" ? "Phone on the guesser's forehead." : "The clue-giver holds it and describes.";
   const n = GN.roster().players.length;
-  GN.$("#turnHint").textContent = `${n * cfg.rounds} turns total, about ${Math.round(n * cfg.rounds * (cfg.len + 25) / 60)} min`;
+  GN.$("#turnHint").textContent = `About ${Math.round(n * cfg.rounds * (cfg.len + 25) / 60)} min`;
 }
 function drawDecks(){
   const el = GN.$("#decks");
   el.innerHTML = DECKS.map(d => `<button class="deck" data-id="${d.id}" aria-pressed="${cfg.decks.includes(d.id)}"><span class="e">${d.emoji || "🃏"}</span><span><span class="n">${GN.esc(d.name)}</span><br><span class="c">${d.cards.length} cards</span></span></button>`).join("");
   GN.$$(".deck", el).forEach(b => b.onclick = () => { const id = b.dataset.id; cfg.decks = cfg.decks.includes(id) ? cfg.decks.filter(x => x !== id) : [...cfg.decks, id]; save(); GN.sfx.tap(); drawDecks(); });
   const total = DECKS.filter(d => cfg.decks.includes(d.id)).reduce((a, d) => a + d.cards.length, 0);
-  GN.$("#deckCount").textContent = `${cfg.decks.length} of ${DECKS.length} decks · ${total} cards in play`;
+  GN.$("#deckCount").textContent = `· ${cfg.decks.length} of ${DECKS.length} on, ${total} cards`;
   GN.$("#go").disabled = !cfg.decks.length;
 }
 
