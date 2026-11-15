@@ -49,7 +49,7 @@
   <header class="hero">
     <div class="kicker">Game night, sorted</div>
     <h1>Parlor<span>.</span></h1>
-    <p class="lede">Party games for clever people. Built for 6 to 8 players, playing solo or in teams of two, with one phone passed around the room.</p>
+    <p class="lede">Party games for 6–8 people. Add your names, pick a game, pass the phone. New here? Try one marked ⭐ easy.</p>
   </header>
 
   <div class="grid2" style="display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));align-items:start">
@@ -82,21 +82,21 @@
 <script src="assets/js/parlor.js"></script>
 <script>
 const GAMES = [
-  { id:"forehead",   nm:"Forehead",        ic:"🤳", c:"#ff6b8b", like:"Like Heads Up · Taboo", p:"Phone on your forehead. Your team shouts clues and you guess before time runs out. Optional forbidden-words mode.", tags:["loud","words"], t:"15–30 min" },
-  { id:"fishbowl",   nm:"Fishbowl",        ic:"🐟", c:"#4cc9f0", like:"Like Monikers · Celebrity", p:"One pile of names, three rounds: describe it, then one word only, then charades. The same cards get funnier each round.", tags:["loud","words","acting"], t:"30–45 min" },
-  { id:"twenty",     nm:"Twenty Questions",ic:"❓", c:"#ffd166", like:"Classic · hot-seat version", p:"One side holds a secret and the room gets 20 yes-or-no questions. Solve it early for big points. The answerer scores if it lands in the sweet spot.", tags:["thinky","deduction"], t:"20–40 min" },
-  { id:"categories", nm:"Categories",      ic:"📝", c:"#7ae582", like:"Like Scattergories", p:"One letter, a dozen clever categories, three minutes. Only unique answers score. Over 850 categories, and other phones can join with a code.", tags:["thinky","words","paper"], t:"20–40 min" },
-  { id:"spectrum",   nm:"Spectrum",        ic:"🎯", c:"#c39bff", like:"Like Wavelength", p:"Somewhere between “Overrated” and “Underrated” is a hidden target. Give one clue and your partner turns the dial.", tags:["thinky","debate"], t:"20–40 min" },
-  { id:"thread",     nm:"Common Thread",   ic:"🧵", c:"#ff9f5a", like:"Like Only Connect", p:"Four clues appear one at a time. Find what links them. Lock in early for more points, or wait for a safer guess.", tags:["thinky","trivia"], t:"15–30 min" },
-  { id:"fictionary", nm:"Fictionary",      ic:"📖", c:"#5eead4", like:"Like Balderdash", p:"A real but obscure word. Everyone invents a convincing definition. Score by finding the real one and by fooling your friends.", tags:["bluffing","words","paper"], t:"30–45 min" },
-  { id:"imposter",   nm:"Imposter",        ic:"🕵️", c:"#f4a3d6", like:"Like The Chameleon · Spyfall", p:"Everyone knows the secret word except one person. Say one word each, then vote. If the imposter is caught, they can still win by guessing the word.", tags:["bluffing","deduction"], t:"15–30 min" },
-  { id:"ballpark",   nm:"Ballpark",        ic:"📏", c:"#6fb6ff", like:"Like Wits & Wagers", p:"How tall is Everest in feet? What year was Coca-Cola invented? Everyone secretly guesses and the closest wins.", tags:["thinky","trivia"], t:"15–30 min" },
-  { id:"hotpotato",  nm:"Hot Potato",      ic:"💣", c:"#ff5d6c", like:"Like Catch Phrase · Pass the Bomb", p:"Shout an answer, pass the phone. The fuse is secret. Whoever is holding it when it blows takes a strike.", tags:["loud","words"], t:"10–20 min" },
-  { id:"hivemind",   nm:"Hive Mind",       ic:"🐝", c:"#ffd23f", like:"Like Herd Mentality", p:"\u201cName a famous pirate.\u201d You only score if you match what most people wrote. Be alone and you get the black sheep.", tags:["social","loud","paper"], t:"15–30 min" },
-  { id:"mostlikely", nm:"Most Likely To",  ic:"👉", c:"#ff8fab", like:"Party classic, with scoring", p:"Who's most likely to accidentally join a cult? Point on three, score for reading the room, and leave with a yearbook of superlatives.", tags:["social","loud"], t:"15–25 min" },
-  { id:"chronology", nm:"Chronology",      ic:"⏳", c:"#ffb84d", like:"Like Timeline", p:"Which came first, the fax machine or the Civil War? Fit each event into your timeline. First to a full timeline wins.", tags:["thinky","trivia"], t:"20–30 min" },
+  { id:"forehead",   nm:"Forehead",        ic:"🤳", c:"#ff6b8b", like:"Like Heads Up · Taboo", p:"Phone on your forehead. Your team shouts clues, you guess.", tags:["loud","words","easy"], t:"15–30 min" },
+  { id:"fishbowl",   nm:"Fishbowl",        ic:"🐟", c:"#4cc9f0", like:"Like Monikers · Celebrity", p:"Same names, three rounds: describe, one word, then charades.", tags:["loud","words","acting"], t:"30–45 min" },
+  { id:"twenty",     nm:"Twenty Questions",ic:"❓", c:"#ffd166", like:"Classic · hot-seat version", p:"One person has a secret. Everyone else asks yes/no questions.", tags:["thinky","deduction"], t:"20–40 min" },
+  { id:"categories", nm:"Categories",      ic:"📝", c:"#7ae582", like:"Like Scattergories", p:"One letter, a list of categories. Only unique answers score.", tags:["thinky","words","paper"], t:"20–40 min" },
+  { id:"spectrum",   nm:"Spectrum",        ic:"🎯", c:"#c39bff", like:"Like Wavelength", p:"Give one clue. Your partner guesses where it sits on a dial.", tags:["thinky","debate"], t:"20–40 min" },
+  { id:"thread",     nm:"Common Thread",   ic:"🧵", c:"#ff9f5a", like:"Like Only Connect", p:"Four clues, one at a time. What links them? Guess early for more points.", tags:["thinky","trivia"], t:"15–30 min" },
+  { id:"fictionary", nm:"Fictionary",      ic:"📖", c:"#5eead4", like:"Like Balderdash", p:"Invent fake definitions for a weird real word. Fool your friends.", tags:["bluffing","words","paper"], t:"30–45 min" },
+  { id:"imposter",   nm:"Imposter",        ic:"🕵️", c:"#f4a3d6", like:"Like The Chameleon · Spyfall", p:"Everyone knows the secret word except one. Find the faker.", tags:["bluffing","deduction","easy"], t:"15–30 min" },
+  { id:"ballpark",   nm:"Ballpark",        ic:"📏", c:"#6fb6ff", like:"Like Wits & Wagers", p:"Secret number guesses. Closest to the real answer wins.", tags:["thinky","trivia"], t:"15–30 min" },
+  { id:"hotpotato",  nm:"Hot Potato",      ic:"💣", c:"#ff5d6c", like:"Like Catch Phrase · Pass the Bomb", p:"Say an answer, pass the phone. Don't be holding it when it blows.", tags:["loud","words","easy"], t:"10–20 min" },
+  { id:"hivemind",   nm:"Hive Mind",       ic:"🐝", c:"#ffd23f", like:"Like Herd Mentality", p:"Write what you think most people will write. Match the crowd to score.", tags:["social","loud","paper","easy"], t:"15–30 min" },
+  { id:"mostlikely", nm:"Most Likely To",  ic:"👉", c:"#ff8fab", like:"Party classic, with scoring", p:"Who's most likely to…? Point on three. Point with the crowd to score.", tags:["social","loud","easy"], t:"15–25 min" },
+  { id:"chronology", nm:"Chronology",      ic:"⏳", c:"#ffb84d", like:"Like Timeline", p:"Put events in the right order on your own timeline.", tags:["thinky","trivia"], t:"20–30 min" },
 ];
-const FILTERS = [["all","All"],["social","Social"],["loud","Loud & fast"],["thinky","Thinky"],["bluffing","Bluffing"],["words","Wordplay"],["trivia","Trivia-ish"]];
+const FILTERS = [["all","All"],["easy","⭐ Easiest"],["social","Social"],["loud","Loud & fast"],["thinky","Thinky"],["bluffing","Bluffing"],["words","Wordplay"],["trivia","Trivia-ish"]];
 let filter = "all";
 
 function drawGames(){
@@ -107,7 +107,7 @@ function drawGames(){
     <a class="g" href="games/${g.id}.html" style="--gc:${g.c}">
       <div class="top"><div class="ic">${g.ic}</div><div><div class="nm">${g.nm}</div><div class="like">${g.like}</div></div></div>
       <p>${g.p}</p>
-      <div class="pillrow"><span class="pill">${g.t}</span>${g.id==="imposter"||g.id==="mostlikely"?`<span class="pill">everyone votes</span>`:`<span class="pill">solo or pairs</span>`}${g.tags.includes("paper")?`<span class="pill">pens help</span>`:""}</div>
+      <div class="pillrow">${g.tags.includes("easy")?`<span class="pill" style="color:var(--ink)">⭐ easy to learn</span>`:""}<span class="pill">${g.t}</span>${g.id==="imposter"||g.id==="mostlikely"?`<span class="pill">everyone votes</span>`:`<span class="pill">solo or pairs</span>`}${g.tags.includes("paper")?`<span class="pill">pens help</span>`:""}</div>
     </a>`).join("");
 }
 

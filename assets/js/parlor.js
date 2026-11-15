@@ -8,6 +8,9 @@ const PREFIX = "parlor.";
 /* ---------- storage (never throws) ---------- */
 GN.get = (k, d) => { try { const v = localStorage.getItem(PREFIX + k); return v == null ? d : JSON.parse(v); } catch(e){ return d; } };
 GN.set = (k, v) => { try { localStorage.setItem(PREFIX + k, JSON.stringify(v)); } catch(e){} };
+/* Bump when game defaults change: clears saved per-game settings (not players or standings). */
+const CFG_VERSION = 2;
+try { if (GN.get("cfgver") !== CFG_VERSION) { Object.keys(localStorage).filter(k => k.startsWith(PREFIX) && k.endsWith(".cfg")).forEach(k => localStorage.removeItem(k)); GN.set("cfgver", CFG_VERSION); } } catch(e){}
 
 /* ---------- tiny DOM helpers ---------- */
 /* While a full-screen stage is open, lookups resolve inside it first, so ids reused
